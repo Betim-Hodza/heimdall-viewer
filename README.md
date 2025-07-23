@@ -191,34 +191,10 @@ npm run pack
 npm run dist
 ```
 
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
-
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## Acknowledgments
-
-- [CycloneDX](https://cyclonedx.org/) for the SBOM specification
-- [Electron](https://www.electronjs.org/) for the desktop framework
-- [Konva.js](https://konvajs.org/) for the canvas graphics library
+This project is licensed under the Apache 2.0 License - see the LICENSE file for details.
 
 ## Support
 
 For issues and feature requests, please create an issue in the repository.
-
-## Roadmap
-
-- [ ] VEX file support
-- [ ] Dependency graph visualization
-- [ ] Vulnerability highlighting
-- [ ] Export to different formats
-- [ ] Search and filter functionality
-- [ ] Batch editing capabilities
-- [ ] Plugin system for custom visualizations
