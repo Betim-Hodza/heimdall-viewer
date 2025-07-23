@@ -1,0 +1,87 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "version": 1,
+  "metadata": {
+    "timestamp": "2025-07-21T23:56:32Z",
+    "tools": [
+      {
+        "vendor": "Heimdall",
+        "name": "SBOM Generator",
+        "version": "2.0.0"
+      }
+    ],
+    "component": {
+      "type": "application",
+      "name": "Unknown",
+      "version": "Unknown"
+    }
+  },
+  "components": [
+    {
+      "type": "library",
+      "name": "sharedlib-main",
+      "version": "2.2.5",
+      "description": "Unknown component",
+      "supplier": {
+        "name": "system-package-manager"
+      },
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "98420a87f97502ebbf6acf90953c615897df94d6046ac251abb4f8ca13f3893b"
+        }
+      ],
+      "purl": "pkg:generic/sharedlib-main@2.2.5",
+      "externalReferences": [
+        {
+          "type": "distribution",
+          "url": "NOASSERTION"
+        }
+      ],
+      "evidence": {
+        "licenses": [
+          {
+            "license": {
+              "id": "MIT"
+            }
+          }
+        ]
+      },
+      "bomRef": "",
+      "cpe": "",
+      "group": ""
+    },
+    {
+      "type": "library",
+      "name": "sharedlib-main",
+      "version": "2.2.5",
+      "description": "Unknown component",
+      "supplier": {
+        "name": "system-package-manager"
+      },
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "98420a87f97502ebbf6acf90953c615897df94d6046ac251abb4f8ca13f3893b"
+        }
+      ],
+      "purl": "pkg:generic/sharedlib-main@2.2.5",
+      "externalReferences": [
+        {
+          "type": "distribution",
+          "url": "NOASSERTION"
+        }
+      ],
+      "evidence": {
+        "licenses": [
+          {
+            "license": {
+              "id": "MIT"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

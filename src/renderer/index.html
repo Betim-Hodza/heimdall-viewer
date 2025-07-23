@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' https://unpkg.com; script-src 'self' 'unsafe-inline' https://unpkg.com; style-src 'self' 'unsafe-inline';">
     <title>Heimdall Viewer</title>
     <link rel="stylesheet" href="styles.css">
 </head>
@@ -36,7 +37,9 @@
 
             <div id="welcomeScreen" class="welcome-screen">
                 <div class="welcome-content">
-                    <div class="welcome-icon">🔍</div>
+                    <div class="welcome-logo">
+                        <img src="heimdall-viewer.png" alt="Heimdall Viewer Logo" class="logo-image">
+                    </div>
                     <h2>Welcome to Heimdall Viewer</h2>
                     <p>Open a CycloneDX SBOM or VEX file to start exploring</p>
                     <button id="welcomeOpenBtn" class="btn btn-primary btn-large">
@@ -70,11 +73,19 @@
                     <span class="icon">🔽</span>
                     Expand
                 </div>
+                <div class="context-menu-item" data-action="expandToFit">
+                    <span class="icon">🔍</span>
+                    Expand To Fit
+                </div>
                 <div class="context-menu-item" data-action="collapse">
                     <span class="icon">🔼</span>
                     Collapse
                 </div>
                 <div class="context-menu-separator"></div>
+                <div class="context-menu-item" data-action="save">
+                    <span class="icon">💾</span>
+                    Save Changes
+                </div>
                 <div class="context-menu-item" data-action="copy">
                     <span class="icon">📋</span>
                     Copy ID
@@ -90,11 +101,7 @@
         </footer>
     </div>
 
-    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <script src="https://unpkg.com/konva@9/konva.min.js"></script>
-    <script src="https://unpkg.com/react-konva@18/umd/react-konva.js"></script>
-    <script src="https://unpkg.com/@cyclonedx/cyclonedx-library@2/dist/cyclonedx.umd.js"></script>
     <script src="app.js"></script>
 </body>
 </html> 

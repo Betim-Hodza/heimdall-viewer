@@ -1,0 +1,208 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "version": 1,
+  "metadata": {
+    "timestamp": "2025-07-23T00:45:34Z",
+    "tools": [
+      {
+        "vendor": "Heimdall",
+        "name": "SBOM Generator",
+        "version": "2.0.0"
+      }
+    ],
+    "component": {
+      "type": "application",
+      "name": "SharedLib Sample Application",
+      "version": "1.0.0"
+    }
+  },
+  "components": [
+    {
+      "type": "library",
+      "name": "libc.so.6",
+      "version": "2.3",
+      "description": "SharedLibrary component",
+      "supplier": {
+        "name": "system-package-manager"
+      },
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "9b20b5f06de53dcf6aea2dc0cdcda8fbf98c1eacc91caacbb8a5c55ebad3f840"
+        }
+      ],
+      "purl": "pkg:system/libc.so.6@2.3",
+      "externalReferences": [
+        {
+          "type": "distribution",
+          "url": "NOASSERTION"
+        }
+      ],
+      "evidence": {
+        "licenses": [
+          {
+            "license": {
+              "id": "MIT"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "library",
+      "name": "libm.so.6",
+      "version": "2.2.5",
+      "description": "SharedLibrary component",
+      "supplier": {
+        "name": "system-package-manager"
+      },
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "cf439f5cff3923d016ce2abc873aa30f5f4f5f992ba1f405519f727b45fd0756"
+        }
+      ],
+      "purl": "pkg:system/libm.so.6@2.2.5",
+      "externalReferences": [
+        {
+          "type": "distribution",
+          "url": "NOASSERTION"
+        }
+      ],
+      "evidence": {
+        "licenses": [
+          {
+            "license": {
+              "id": "NOASSERTION"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "library",
+      "name": "libstdc++.so.6",
+      "version": "3.4.10",
+      "description": "SharedLibrary component",
+      "supplier": {
+        "name": "system-package-manager"
+      },
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "0ba7ea90bd3c6aaad43bda856e78677566386fde7854a7acd36567a869a89798"
+        }
+      ],
+      "purl": "pkg:system/libstdc++.so.6@3.4.10",
+      "externalReferences": [
+        {
+          "type": "distribution",
+          "url": "NOASSERTION"
+        }
+      ],
+      "evidence": {
+        "licenses": [
+          {
+            "license": {
+              "id": "MIT"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "library",
+      "name": "libshared_greeter.so",
+      "version": "2.2.5",
+      "description": "SharedLibrary component",
+      "supplier": {
+        "name": "system-package-manager"
+      },
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "bcdb57e5ca2772745577864d125441b47401224b9cd120b8f27da41e000f8619"
+        }
+      ],
+      "purl": "pkg:generic/libshared_greeter.so@2.2.5",
+      "externalReferences": [
+        {
+          "type": "distribution",
+          "url": "NOASSERTION"
+        }
+      ],
+      "evidence": {
+        "licenses": [
+          {
+            "license": {
+              "id": "NOASSERTION"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "library",
+      "name": "libgcc_s.so.1",
+      "version": "3.0",
+      "description": "SharedLibrary component",
+      "supplier": {
+        "name": "system-package-manager"
+      },
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "7565f226204bf69d12a259489f722159f91d4e55109848e67b9e0f8deddb1c98"
+        }
+      ],
+      "purl": "pkg:system/libgcc_s.so.1@3.0",
+      "externalReferences": [
+        {
+          "type": "distribution",
+          "url": "NOASSERTION"
+        }
+      ],
+      "evidence": {
+        "licenses": [
+          {
+            "license": {
+              "id": "NOASSERTION"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "library",
+      "name": "sharedlib-main",
+      "version": "3.4.21",
+      "description": "Unknown component",
+      "supplier": {
+        "name": "system-package-manager"
+      },
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "803722f5951e0a523f936ec4dc3f087b2c2c9bb81c0ba699d2d1d70fc8f3dcbc"
+        }
+      ],
+      "purl": "pkg:generic/sharedlib-main@3.4.21",
+      "externalReferences": [
+        {
+          "type": "distribution",
+          "url": "NOASSERTION"
+        }
+      ],
+      "evidence": {
+        "licenses": [
+          {
+            "license": {
+              "id": "MIT"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

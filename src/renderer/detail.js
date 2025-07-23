@@ -82,36 +82,70 @@ function loadItemData() {
     showLoading();
     
     try {
-        // Update title
-        detailTitle.textContent = `${currentItemType.charAt(0).toUpperCase() + currentItemType.slice(1)} Details - ${currentItemData.name || currentItemData.bomRef || 'Unknown'}`;
-        
-        // Basic information
-        nameField.value = currentItemData.name || '';
-        versionField.value = currentItemData.version || '';
-        typeField.value = currentItemData.type || '';
-        bomRefField.value = currentItemData.bomRef || '';
-        
-        // Package information
-        purlField.value = currentItemData.purl || '';
-        cpeField.value = currentItemData.cpe || '';
-        groupField.value = currentItemData.group || '';
-        descriptionField.value = currentItemData.description || '';
-        
-        // Licensing
-        if (currentItemData.licenses && currentItemData.licenses.length > 0) {
-            const license = currentItemData.licenses[0];
-            licenseField.value = license.license?.id || license.expression || '';
-            licenseTextField.value = license.license?.text || '';
+        if (currentItemType === 'sbom') {
+            // Handle SBOM data
+            detailTitle.textContent = `SBOM Details - ${currentItemData.metadata?.component?.name || 'Software Bill of Materials'}`;
+            
+            // SBOM-specific fields
+            nameField.value = currentItemData.metadata?.component?.name || '';
+            versionField.value = currentItemData.metadata?.component?.version || '';
+            typeField.value = currentItemData.metadata?.component?.type || '';
+            bomRefField.value = currentItemData.metadata?.component?.bomRef || '';
+            
+            // Package information (from metadata component)
+            purlField.value = currentItemData.metadata?.component?.purl || '';
+            cpeField.value = currentItemData.metadata?.component?.cpe || '';
+            groupField.value = currentItemData.metadata?.component?.group || '';
+            descriptionField.value = currentItemData.metadata?.component?.description || '';
+            
+            // Licensing (from metadata component)
+            if (currentItemData.metadata?.component?.licenses && currentItemData.metadata.component.licenses.length > 0) {
+                const license = currentItemData.metadata.component.licenses[0];
+                licenseField.value = license.license?.id || license.expression || '';
+                licenseTextField.value = license.license?.text || '';
+            } else {
+                licenseField.value = '';
+                licenseTextField.value = '';
+            }
+            
+            // External references (from metadata component)
+            loadExternalReferences();
+            
+            // Properties (from metadata component)
+            loadProperties();
+            
         } else {
-            licenseField.value = '';
-            licenseTextField.value = '';
+            // Handle component data (existing logic)
+            detailTitle.textContent = `${currentItemType.charAt(0).toUpperCase() + currentItemType.slice(1)} Details - ${currentItemData.name || currentItemData.bomRef || 'Unknown'}`;
+            
+            // Basic information
+            nameField.value = currentItemData.name || '';
+            versionField.value = currentItemData.version || '';
+            typeField.value = currentItemData.type || '';
+            bomRefField.value = currentItemData.bomRef || '';
+            
+            // Package information
+            purlField.value = currentItemData.purl || '';
+            cpeField.value = currentItemData.cpe || '';
+            groupField.value = currentItemData.group || '';
+            descriptionField.value = currentItemData.description || '';
+            
+            // Licensing
+            if (currentItemData.licenses && currentItemData.licenses.length > 0) {
+                const license = currentItemData.licenses[0];
+                licenseField.value = license.license?.id || license.expression || '';
+                licenseTextField.value = license.license?.text || '';
+            } else {
+                licenseField.value = '';
+                licenseTextField.value = '';
+            }
+            
+            // External references
+            loadExternalReferences();
+            
+            // Properties
+            loadProperties();
         }
-        
-        // External references
-        loadExternalReferences();
-        
-        // Properties
-        loadProperties();
         
         hasChanges = false;
         showForm();
@@ -127,12 +161,19 @@ function loadItemData() {
 function loadExternalReferences() {
     externalReferencesContainer.innerHTML = '';
     
-    if (!currentItemData.externalReferences || currentItemData.externalReferences.length === 0) {
+    let references = [];
+    if (currentItemType === 'sbom') {
+        references = currentItemData.metadata?.component?.externalReferences || [];
+    } else {
+        references = currentItemData.externalReferences || [];
+    }
+    
+    if (references.length === 0) {
         addReference(); // Add one empty reference
         return;
     }
     
-    currentItemData.externalReferences.forEach(ref => {
+    references.forEach(ref => {
         addReference(ref);
     });
 }
@@ -141,12 +182,19 @@ function loadExternalReferences() {
 function loadProperties() {
     propertiesContainer.innerHTML = '';
     
-    if (!currentItemData.properties || currentItemData.properties.length === 0) {
+    let properties = [];
+    if (currentItemType === 'sbom') {
+        properties = currentItemData.metadata?.component?.properties || [];
+    } else {
+        properties = currentItemData.properties || [];
+    }
+    
+    if (properties.length === 0) {
         addProperty(); // Add one empty property
         return;
     }
     
-    currentItemData.properties.forEach(prop => {
+    properties.forEach(prop => {
         addProperty(prop);
     });
 }
@@ -387,7 +435,18 @@ async function saveChanges() {
         showLoading();
         
         // Update the item data
-        const updatedData = { ...currentItemData, ...formData };
+        let updatedData;
+        if (currentItemType === 'sbom') {
+            // For SBOM, update the metadata.component section
+            updatedData = { ...currentItemData };
+            if (!updatedData.metadata) {
+                updatedData.metadata = {};
+            }
+            updatedData.metadata.component = { ...updatedData.metadata.component, ...formData };
+        } else {
+            // For components, update the root level
+            updatedData = { ...currentItemData, ...formData };
+        }
         
         // Send update to main process
         await window.heimdallAPI.updateItem(currentItemData, currentItemType, updatedData);
