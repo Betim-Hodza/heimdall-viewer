@@ -10,6 +10,15 @@ let zoomLevel = 1;
 let sbomExpanded = false;
 let expandedComponents = new Set(); // Track which components are expanded
 
+// Selection box variables
+let selectionBox = null;
+let isSelecting = false;
+let selectionStartPos = null;
+
+// Pan variables
+let isPanning = false;
+let panStartPos = null;
+
 // DOM elements
 const welcomeScreen = document.getElementById('welcomeScreen');
 const canvasContainer = document.getElementById('canvasContainer');
@@ -84,6 +93,40 @@ function setupCanvas() {
         // Only show context menu if clicking on empty space (not on a component)
         if (e.target === stage) {
             showContextMenu(e, null);
+        }
+    });
+    
+    // Mouse event handlers for selection and panning
+    stage.on('mousedown', (e) => {
+        // Only handle left-click on empty space
+        if (e.target === stage && e.evt.button === 0) {
+            // Deselect all items when clicking on empty canvas
+            deselectAll();
+            
+            // Check if we should start selection or panning
+            if (e.evt.shiftKey) {
+                // Shift+click starts panning
+                startPanning(e);
+            } else {
+                // Regular click starts selection
+                startSelection(e);
+            }
+        }
+    });
+    
+    stage.on('mousemove', (e) => {
+        if (isSelecting) {
+            updateSelection(e);
+        } else if (isPanning) {
+            updatePanning(e);
+        }
+    });
+    
+    stage.on('mouseup', (e) => {
+        if (isSelecting) {
+            endSelection(e);
+        } else if (isPanning) {
+            endPanning(e);
         }
     });
 }
@@ -287,17 +330,13 @@ function renderSBOM() {
         }
     });
     
-    // Set initial zoom to 1 for normal size
-    zoomLevel = 1;
-    stage.scale({ x: 1, y: 1 });
-    stage.position({ x: 0, y: 0 });
-    stage.batchDraw();
-    
-    // Only fit to screen if components would be too large
-    const stageRect = stage.getClientRect();
-    const layerRect = layer.getClientRect();
-    if (layerRect.width > stageRect.width || layerRect.height > stageRect.height) {
-        fitToScreen();
+    // Only set initial zoom and position if this is the first render
+    if (zoomLevel === 1 && stage.position().x === 0 && stage.position().y === 0) {
+        // Set initial zoom to 1 for normal size
+        zoomLevel = 1;
+        stage.scale({ x: 1, y: 1 });
+        stage.position({ x: 0, y: 0 });
+        stage.batchDraw();
     }
 }
 
@@ -471,13 +510,41 @@ function createComponentBox(component, x, y, width, height, level) {
     
     // Store component data
     group.componentData = component;
+    group.isComponent = true;
     
     // Event handlers
     group.on('click', (e) => handleComponentClick(e, group));
     group.on('dblclick', () => expandComponent(group));
     group.on('contextmenu', (e) => showContextMenu(e, group));
+    group.on('dragstart', () => {
+        // Store initial position for multi-selection dragging
+        group.setAttr('lastX', group.x());
+        group.setAttr('lastY', group.y());
+    });
     group.on('dragmove', () => {
-        // Constrain to canvas boundaries
+        // If this component is part of a selection, move all selected components together
+        if (selectedNodes.length > 1 && selectedNodes.includes(group)) {
+            const dx = group.x() - group.getAttr('lastX');
+            const dy = group.y() - group.getAttr('lastY');
+            
+            selectedNodes.forEach(selectedNode => {
+                if (selectedNode !== group) {
+                    const newX = selectedNode.x() + dx;
+                    const newY = selectedNode.y() + dy;
+                    
+                    // Constrain to canvas boundaries
+                    const maxX = stage.width() - width;
+                    const maxY = stage.height() - height;
+                    
+                    selectedNode.x(Math.max(0, Math.min(maxX, newX)));
+                    selectedNode.y(Math.max(0, Math.min(maxY, newY)));
+                    
+                    updateConnectionLine(selectedNode);
+                }
+            });
+        }
+        
+        // Constrain the dragged component to canvas boundaries
         const x = group.x();
         const y = group.y();
         const maxX = stage.width() - width;
@@ -487,6 +554,10 @@ function createComponentBox(component, x, y, width, height, level) {
         if (y < 0) group.y(0);
         if (x > maxX) group.x(maxX);
         if (y > maxY) group.y(maxY);
+        
+        // Store current position for next drag move
+        group.setAttr('lastX', group.x());
+        group.setAttr('lastY', group.y());
         
         updateConnectionLine(group);
     });
@@ -586,7 +657,7 @@ function createSBOMBox(centerX, y) {
     
     // Event handlers
     group.on('click', (e) => handleComponentClick(e, group));
-    group.on('dblclick', () => expandSBOM(group));
+    group.on('dblclick', () => toggleSBOM(group));
     group.on('contextmenu', (e) => showContextMenu(e, group));
     group.on('dragmove', () => {
         // Constrain to canvas boundaries
@@ -619,6 +690,11 @@ function createSBOMBox(centerX, y) {
 
 // Component interactions
 function handleComponentClick(e, group) {
+    // Don't handle clicks if we're in selection mode
+    if (isSelecting) {
+        return;
+    }
+    
     const isCtrlClick = e.evt.ctrlKey || e.evt.metaKey;
     
     if (isCtrlClick) {
@@ -652,21 +728,7 @@ function handleComponentClick(e, group) {
     } else {
         // Single selection
         // Clear previous selections
-        selectedNodes.forEach(node => {
-            const rect = node.findOne('Rect');
-            if (rect) {
-                rect.stroke('#fff');
-                rect.strokeWidth(2);
-            }
-        });
-        
-        if (selectedNode) {
-            const prevRect = selectedNode.findOne('Rect');
-            if (prevRect) {
-                prevRect.stroke('#fff');
-                prevRect.strokeWidth(2);
-            }
-        }
+        deselectAll();
         
         selectedNodes = [group];
         selectedNode = group;
@@ -688,29 +750,33 @@ function handleComponentClick(e, group) {
 }
 
 function expandSBOM(group) {
-    console.log('Toggling SBOM expansion');
-    console.log('Current sbomExpanded:', sbomExpanded);
-    sbomExpanded = !sbomExpanded;
-    console.log('New sbomExpanded:', sbomExpanded);
-    
-    if (sbomExpanded) {
-        showStatus('SBOM expanded - showing all components');
-        console.log('SBOM expanded - expandedComponents size:', expandedComponents.size);
-    } else {
-        showStatus('SBOM collapsed - showing only root');
-        // Clear all expanded components when collapsing SBOM
-        expandedComponents.clear();
-        console.log('Cleared expandedComponents - size now:', expandedComponents.size);
-    }
+    console.log('Expanding SBOM');
+    sbomExpanded = true;
+    showStatus('SBOM expanded - showing all components');
+    console.log('SBOM expanded - expandedComponents size:', expandedComponents.size);
     
     // Re-render with updated expansion state
     renderSBOM();
+}
+
+function collapseSBOM(group) {
+    console.log('Collapsing SBOM');
+    sbomExpanded = false;
+    showStatus('SBOM collapsed - showing only root');
+    // Clear all expanded components when collapsing SBOM
+    expandedComponents.clear();
+    console.log('Cleared expandedComponents - size now:', expandedComponents.size);
     
-    // Auto-fit to screen when expanding
+    // Re-render with updated expansion state
+    renderSBOM();
+}
+
+function toggleSBOM(group) {
+    console.log('Toggling SBOM expansion');
     if (sbomExpanded) {
-        setTimeout(() => {
-            fitToScreen();
-        }, 100);
+        collapseSBOM(group);
+    } else {
+        expandSBOM(group);
     }
 }
 
@@ -720,12 +786,7 @@ function expandSBOMToFit(group) {
     
     // Re-render with updated expansion state
     renderSBOM();
-    
-    // Fit to screen after rendering
-    setTimeout(() => {
-        fitToScreen();
-        showStatus('SBOM expanded and fitted to canvas');
-    }, 100);
+    showStatus('SBOM expanded');
 }
 
 function expandComponentToFit(group) {
@@ -786,13 +847,6 @@ function expandComponent(group) {
             
             // Re-render to show/hide dependencies
             renderSBOM();
-            
-            // Auto-fit if expanding
-            if (expandedComponents.has(component.bomRef)) {
-                setTimeout(() => {
-                    fitToScreen();
-                }, 100);
-            }
         } else {
             showStatus(`No dependencies found for ${component.name}`);
         }
@@ -864,7 +918,7 @@ function handleContextMenuClick(e) {
                 expandSBOMToFit(contextMenu);
                 break;
             case 'collapse':
-                expandSBOM(contextMenu);
+                collapseSBOM(contextMenu);
                 break;
             case 'save':
                 saveChangesToFile();
@@ -1185,6 +1239,196 @@ async function saveChangesToFile() {
             showError(`Failed to save changes: ${error.message}`);
         }
     }
+}
+
+// Selection box functions
+function deselectAll() {
+    // Clear previous selections
+    selectedNodes.forEach(node => {
+        const rect = node.findOne('Rect');
+        if (rect) {
+            rect.stroke('#fff');
+            rect.strokeWidth(2);
+        }
+    });
+    
+    selectedNodes = [];
+    selectedNode = null;
+    showStatus('Ready');
+    layer.draw();
+}
+
+function updateSelectionFromBox(startX, startY, endX, endY) {
+    // Find components within the selection box
+    const selectedComponents = [];
+    layer.children.forEach(child => {
+        if (child.isComponent || child.isSBOMRoot) {
+            // Convert component position to stage coordinates
+            const childPos = child.getAbsolutePosition();
+            const childRect = child.getClientRect();
+            
+            // Check if component intersects with selection box
+            if (childPos.x + childRect.width >= startX && 
+                childPos.x <= endX &&
+                childPos.y + childRect.height >= startY && 
+                childPos.y <= endY) {
+                selectedComponents.push(child);
+            }
+        }
+    });
+    
+    // First, deselect all components that are no longer in the selection box
+    selectedNodes.forEach(node => {
+        if (!selectedComponents.includes(node)) {
+            const rect = node.findOne('Rect');
+            if (rect) {
+                rect.stroke('#fff');
+                rect.strokeWidth(2);
+            }
+        }
+    });
+    
+    // Then, select all components that are in the selection box
+    selectedComponents.forEach(node => {
+        const rect = node.findOne('Rect');
+        if (rect) {
+            rect.stroke('#ffd700');
+            rect.strokeWidth(3);
+        }
+    });
+    
+    // Update the selected nodes array
+    selectedNodes = selectedComponents;
+    selectedNode = selectedComponents.length > 0 ? selectedComponents[0] : null;
+    
+    // Update status
+    if (selectedComponents.length > 0) {
+        showStatus(`Selected ${selectedComponents.length} component(s)`);
+    } else {
+        showStatus('Ready');
+    }
+}
+
+function startSelection(e) {
+    const pos = stage.getPointerPosition();
+    isSelecting = true;
+    selectionStartPos = pos;
+    
+    // Clear any existing selections when starting a new selection box
+    deselectAll();
+    
+    // Convert stage coordinates to layer coordinates
+    const layerPos = layer.getTransform().copy().invert().point(pos);
+    
+    // Create selection box using layer coordinates
+    selectionBox = new Konva.Rect({
+        x: layerPos.x,
+        y: layerPos.y,
+        width: 0,
+        height: 0,
+        stroke: '#0096fd',
+        strokeWidth: 2,
+        dash: [5, 5],
+        fill: 'rgba(0, 150, 253, 0.1)'
+    });
+    
+    layer.add(selectionBox);
+    layer.draw();
+}
+
+function updateSelection(e) {
+    if (!isSelecting || !selectionBox || !selectionStartPos) return;
+    
+    const pos = stage.getPointerPosition();
+    
+    // Convert stage coordinates to layer coordinates
+    const layerTransform = layer.getTransform().copy().invert();
+    const layerPos = layerTransform.point(pos);
+    const layerStartPos = layerTransform.point(selectionStartPos);
+    
+    const startX = Math.min(layerStartPos.x, layerPos.x);
+    const startY = Math.min(layerStartPos.y, layerPos.y);
+    const width = Math.abs(layerPos.x - layerStartPos.x);
+    const height = Math.abs(layerPos.y - layerStartPos.y);
+    
+    selectionBox.x(startX);
+    selectionBox.y(startY);
+    selectionBox.width(width);
+    selectionBox.height(height);
+    
+    // Update selection in real-time as the box changes
+    // Convert back to stage coordinates for component intersection testing
+    const stageStartX = Math.min(selectionStartPos.x, pos.x);
+    const stageStartY = Math.min(selectionStartPos.y, pos.y);
+    const stageEndX = Math.max(selectionStartPos.x, pos.x);
+    const stageEndY = Math.max(selectionStartPos.y, pos.y);
+    updateSelectionFromBox(stageStartX, stageStartY, stageEndX, stageEndY);
+    
+    layer.draw();
+}
+
+function endSelection(e) {
+    if (!isSelecting || !selectionBox || !selectionStartPos) return;
+    
+    // Finalize the selection based on the current box
+    const pos = stage.getPointerPosition();
+    const startX = Math.min(selectionStartPos.x, pos.x);
+    const startY = Math.min(selectionStartPos.y, pos.y);
+    const endX = Math.max(selectionStartPos.x, pos.x);
+    const endY = Math.max(selectionStartPos.y, pos.y);
+    
+    // Final update of selection
+    updateSelectionFromBox(startX, startY, endX, endY);
+    
+    // Clean up selection box
+    if (selectionBox) {
+        selectionBox.destroy();
+        selectionBox = null;
+    }
+    
+    isSelecting = false;
+    selectionStartPos = null;
+    layer.draw();
+}
+
+// Panning functions
+function startPanning(e) {
+    const pos = stage.getPointerPosition();
+    isPanning = true;
+    panStartPos = pos;
+    
+    // Change cursor to indicate panning
+    document.body.style.cursor = 'grabbing';
+}
+
+function updatePanning(e) {
+    if (!isPanning || !panStartPos) return;
+    
+    const pos = stage.getPointerPosition();
+    const dx = pos.x - panStartPos.x;
+    const dy = pos.y - panStartPos.y;
+    
+    // Move the layer (which contains all components)
+    const currentPos = layer.position();
+    layer.position({
+        x: currentPos.x + dx,
+        y: currentPos.y + dy
+    });
+    
+    // Update the pan start position for the next move
+    panStartPos = pos;
+    
+    layer.draw();
+}
+
+function endPanning(e) {
+    if (!isPanning) return;
+    
+    isPanning = false;
+    panStartPos = null;
+    
+    // Reset cursor
+    document.body.style.cursor = 'default';
 }
 
 // Initialize the application when the page loads
