@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Component Details - Heimdall Viewer</title>
+    <link rel="stylesheet" href="detail-styles.css">
+</head>
+<body>
+    <div id="detailApp">
+        <header class="detail-header">
+            <div class="header-content">
+                <h2 id="detailTitle">Component Details</h2>
+                <div class="toolbar">
+                    <button id="saveBtn" class="btn btn-primary">
+                        <span class="icon">💾</span>
+                        Save Changes
+                    </button>
+                    <button id="closeBtn" class="btn btn-secondary">
+                        <span class="icon">✕</span>
+                        Close
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <main class="detail-content">
+            <div id="loadingOverlay" class="loading-overlay hidden">
+                <div class="loading-spinner"></div>
+                <p>Loading component...</p>
+            </div>
+
+            <div id="detailForm" class="detail-form hidden">
+                <div class="form-section">
+                    <h3>Basic Information</h3>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="name">Name *</label>
+                            <input type="text" id="name" name="name" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="version">Version</label>
+                            <input type="text" id="version" name="version">
+                        </div>
+                        <div class="form-group">
+                            <label for="type">Type *</label>
+                            <select id="type" name="type" required>
+                                <option value="">Select type...</option>
+                                <option value="application">Application</option>
+                                <option value="framework">Framework</option>
+                                <option value="library">Library</option>
+                                <option value="container">Container</option>
+                                <option value="operating-system">Operating System</option>
+                                <option value="device">Device</option>
+                                <option value="firmware">Firmware</option>
+                                <option value="file">File</option>
+                                <option value="hardware">Hardware</option>
+                                <option value="platform">Platform</option>
+                                <option value="service">Service</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="bomRef">BOM Reference</label>
+                            <input type="text" id="bomRef" name="bomRef" readonly>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <h3>Package Information</h3>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="purl">Package URL (PURL)</label>
+                            <input type="text" id="purl" name="purl" placeholder="pkg:npm/package@version">
+                        </div>
+                        <div class="form-group">
+                            <label for="cpe">CPE</label>
+                            <input type="text" id="cpe" name="cpe" placeholder="cpe:2.3:a:vendor:product:version">
+                        </div>
+                        <div class="form-group">
+                            <label for="group">Group</label>
+                            <input type="text" id="group" name="group">
+                        </div>
+                        <div class="form-group">
+                            <label for="description">Description</label>
+                            <textarea id="description" name="description" rows="3"></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <h3>Licensing</h3>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="license">License</label>
+                            <select id="license" name="license">
+                                <option value="">Select license...</option>
+                                <option value="MIT">MIT License</option>
+                                <option value="Apache-2.0">Apache License 2.0</option>
+                                <option value="GPL-2.0">GNU General Public License v2.0</option>
+                                <option value="GPL-3.0">GNU General Public License v3.0</option>
+                                <option value="BSD-2-Clause">BSD 2-Clause License</option>
+                                <option value="BSD-3-Clause">BSD 3-Clause License</option>
+                                <option value="ISC">ISC License</option>
+                                <option value="MPL-2.0">Mozilla Public License 2.0</option>
+                                <option value="LGPL-2.1">GNU Lesser General Public License v2.1</option>
+                                <option value="LGPL-3.0">GNU Lesser General Public License v3.0</option>
+                                <option value="AGPL-3.0">GNU Affero General Public License v3.0</option>
+                                <option value="EPL-1.0">Eclipse Public License 1.0</option>
+                                <option value="EPL-2.0">Eclipse Public License 2.0</option>
+                                <option value="CC0-1.0">Creative Commons Zero v1.0</option>
+                                <option value="CC-BY-4.0">Creative Commons Attribution 4.0</option>
+                                <option value="CC-BY-SA-4.0">Creative Commons Attribution-ShareAlike 4.0</option>
+                                <option value="Unlicense">The Unlicense</option>
+                                <option value="WTFPL">Do What The F*ck You Want To Public License</option>
+                                <option value="custom">Custom License</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="licenseText">License Text</label>
+                            <textarea id="licenseText" name="licenseText" rows="5" placeholder="Paste license text here..."></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <h3>External References</h3>
+                    <div id="externalReferences" class="external-references">
+                        <div class="reference-item">
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label>Type</label>
+                                    <select class="ref-type">
+                                        <option value="website">Website</option>
+                                        <option value="issue-tracker">Issue Tracker</option>
+                                        <option value="vcs">Version Control System</option>
+                                        <option value="ci-build">CI Build</option>
+                                        <option value="quality-gate">Quality Gate</option>
+                                        <option value="advisories">Security Advisories</option>
+                                        <option value="bom">BOM</option>
+                                        <option value="mailing-list">Mailing List</option>
+                                        <option value="social">Social</option>
+                                        <option value="chat">Chat</option>
+                                        <option value="documentation">Documentation</option>
+                                        <option value="support">Support</option>
+                                        <option value="distribution">Distribution</option>
+                                        <option value="license">License</option>
+                                        <option value="build-meta">Build Meta</option>
+                                        <option value="build-system">Build System</option>
+                                        <option value="release-notes">Release Notes</option>
+                                        <option value="other">Other</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>URL</label>
+                                    <input type="url" class="ref-url" placeholder="https://example.com">
+                                </div>
+                                <div class="form-group">
+                                    <label>Comment</label>
+                                    <input type="text" class="ref-comment" placeholder="Optional comment">
+                                </div>
+                                <div class="form-group">
+                                    <button type="button" class="btn btn-danger btn-small remove-ref">Remove</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <button type="button" id="addReferenceBtn" class="btn btn-secondary">
+                        <span class="icon">+</span>
+                        Add Reference
+                    </button>
+                </div>
+
+                <div class="form-section">
+                    <h3>Properties</h3>
+                    <div id="properties" class="properties">
+                        <div class="property-item">
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label>Name</label>
+                                    <input type="text" class="prop-name" placeholder="Property name">
+                                </div>
+                                <div class="form-group">
+                                    <label>Value</label>
+                                    <input type="text" class="prop-value" placeholder="Property value">
+                                </div>
+                                <div class="form-group">
+                                    <button type="button" class="btn btn-danger btn-small remove-prop">Remove</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <button type="button" id="addPropertyBtn" class="btn btn-secondary">
+                        <span class="icon">+</span>
+                        Add Property
+                    </button>
+                </div>
+            </div>
+        </main>
+
+        <footer class="detail-footer">
+            <div class="footer-content">
+                <span id="statusInfo" class="status-info">Ready</span>
+                <span id="validationInfo" class="validation-info"></span>
+            </div>
+        </footer>
+    </div>
+
+    <script src="detail.js"></script>
+</body>
+</html> 

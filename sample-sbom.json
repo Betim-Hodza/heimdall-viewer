@@ -1,0 +1,254 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.4",
+  "version": 1,
+  "metadata": {
+    "timestamp": "2024-01-15T10:30:00Z",
+    "tools": [
+      {
+        "vendor": "Example Corp",
+        "name": "Heimdall Viewer",
+        "version": "1.0.0"
+      }
+    ],
+    "component": {
+      "type": "application",
+      "name": "Sample Application",
+      "version": "1.0.0",
+      "description": "A sample application for testing Heimdall Viewer"
+    }
+  },
+  "components": [
+    {
+      "type": "application",
+      "name": "Sample Application",
+      "version": "1.0.0",
+      "bomRef": "app-1",
+      "description": "Main application component",
+      "purl": "pkg:generic/sample-app@1.0.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT",
+            "text": "MIT License\n\nCopyright (c) 2024 Sample Corp\n\nPermission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the \"Software\"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE."
+          }
+        }
+      ],
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://example.com/sample-app",
+          "comment": "Official website"
+        },
+        {
+          "type": "vcs",
+          "url": "https://github.com/example/sample-app",
+          "comment": "Source code repository"
+        }
+      ],
+      "properties": [
+        {
+          "name": "build:target",
+          "value": "production"
+        },
+        {
+          "name": "build:optimized",
+          "value": "true"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "express",
+      "version": "4.18.2",
+      "bomRef": "lib-express",
+      "description": "Fast, unopinionated, minimalist web framework for Node.js",
+      "purl": "pkg:npm/express@4.18.2",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://expressjs.com/"
+        },
+        {
+          "type": "vcs",
+          "url": "https://github.com/expressjs/express"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "react",
+      "version": "18.2.0",
+      "bomRef": "lib-react",
+      "description": "A JavaScript library for building user interfaces",
+      "purl": "pkg:npm/react@18.2.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://reactjs.org/"
+        },
+        {
+          "type": "vcs",
+          "url": "https://github.com/facebook/react"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "lodash",
+      "version": "4.17.21",
+      "bomRef": "lib-lodash",
+      "description": "A modern JavaScript utility library delivering modularity, performance & extras",
+      "purl": "pkg:npm/lodash@4.17.21",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://lodash.com/"
+        },
+        {
+          "type": "vcs",
+          "url": "https://github.com/lodash/lodash"
+        }
+      ]
+    },
+    {
+      "type": "container",
+      "name": "nginx",
+      "version": "1.24.0",
+      "bomRef": "container-nginx",
+      "description": "Nginx web server container",
+      "purl": "pkg:docker/nginx@1.24.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "BSD-2-Clause"
+          }
+        }
+      ],
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://nginx.org/"
+        },
+        {
+          "type": "vcs",
+          "url": "https://github.com/nginx/nginx"
+        }
+      ]
+    },
+    {
+      "type": "operating-system",
+      "name": "Ubuntu",
+      "version": "22.04.3",
+      "bomRef": "os-ubuntu",
+      "description": "Ubuntu Linux operating system",
+      "purl": "pkg:generic/ubuntu@22.04.3",
+      "licenses": [
+        {
+          "license": {
+            "id": "GPL-2.0"
+          }
+        }
+      ],
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://ubuntu.com/"
+        },
+        {
+          "type": "distribution",
+          "url": "https://releases.ubuntu.com/22.04/"
+        }
+      ]
+    },
+    {
+      "type": "framework",
+      "name": "electron",
+      "version": "28.0.0",
+      "bomRef": "framework-electron",
+      "description": "Build cross-platform desktop apps with JavaScript, HTML, and CSS",
+      "purl": "pkg:npm/electron@28.0.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://www.electronjs.org/"
+        },
+        {
+          "type": "vcs",
+          "url": "https://github.com/electron/electron"
+        }
+      ]
+    },
+    {
+      "type": "service",
+      "name": "postgresql",
+      "version": "15.4",
+      "bomRef": "service-postgresql",
+      "description": "PostgreSQL database service",
+      "purl": "pkg:generic/postgresql@15.4",
+      "licenses": [
+        {
+          "license": {
+            "id": "PostgreSQL"
+          }
+        }
+      ],
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://www.postgresql.org/"
+        },
+        {
+          "type": "documentation",
+          "url": "https://www.postgresql.org/docs/"
+        }
+      ]
+    }
+  ],
+  "dependencies": [
+    {
+      "ref": "app-1",
+      "dependsOn": ["lib-express", "lib-react", "framework-electron"]
+    },
+    {
+      "ref": "lib-express",
+      "dependsOn": ["lib-lodash"]
+    },
+    {
+      "ref": "lib-react",
+      "dependsOn": []
+    },
+    {
+      "ref": "framework-electron",
+      "dependsOn": ["os-ubuntu"]
+    }
+  ]
+} 

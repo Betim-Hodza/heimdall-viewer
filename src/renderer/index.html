@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Heimdall Viewer</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="app">
+        <header class="header">
+            <div class="header-content">
+                <h1 class="app-title">Heimdall Viewer</h1>
+                <div class="toolbar">
+                    <button id="openFileBtn" class="btn btn-primary">
+                        <span class="icon">📁</span>
+                        Open SBOM/VEX
+                    </button>
+                    <button id="saveFileBtn" class="btn btn-secondary" disabled>
+                        <span class="icon">💾</span>
+                        Save
+                    </button>
+                    <button id="saveAsBtn" class="btn btn-secondary" disabled>
+                        <span class="icon">💾</span>
+                        Save As
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <main class="main-content">
+            <div id="loadingOverlay" class="loading-overlay hidden">
+                <div class="loading-spinner"></div>
+                <p>Loading SBOM...</p>
+            </div>
+
+            <div id="welcomeScreen" class="welcome-screen">
+                <div class="welcome-content">
+                    <div class="welcome-icon">🔍</div>
+                    <h2>Welcome to Heimdall Viewer</h2>
+                    <p>Open a CycloneDX SBOM or VEX file to start exploring</p>
+                    <button id="welcomeOpenBtn" class="btn btn-primary btn-large">
+                        <span class="icon">📁</span>
+                        Open File
+                    </button>
+                </div>
+            </div>
+
+            <div id="canvasContainer" class="canvas-container hidden">
+                <div class="canvas-toolbar">
+                    <div class="zoom-controls">
+                        <button id="zoomInBtn" class="btn btn-icon" title="Zoom In">🔍+</button>
+                        <button id="zoomOutBtn" class="btn btn-icon" title="Zoom Out">🔍-</button>
+                        <button id="resetZoomBtn" class="btn btn-icon" title="Reset Zoom">🔍</button>
+                    </div>
+                    <div class="view-controls">
+                        <button id="fitToScreenBtn" class="btn btn-secondary">Fit to Screen</button>
+                        <button id="centerViewBtn" class="btn btn-secondary">Center View</button>
+                    </div>
+                </div>
+                <div id="canvas" class="canvas"></div>
+            </div>
+
+            <div id="contextMenu" class="context-menu hidden">
+                <div class="context-menu-item" data-action="open">
+                    <span class="icon">📄</span>
+                    Open Details
+                </div>
+                <div class="context-menu-item" data-action="expand">
+                    <span class="icon">🔽</span>
+                    Expand
+                </div>
+                <div class="context-menu-item" data-action="collapse">
+                    <span class="icon">🔼</span>
+                    Collapse
+                </div>
+                <div class="context-menu-separator"></div>
+                <div class="context-menu-item" data-action="copy">
+                    <span class="icon">📋</span>
+                    Copy ID
+                </div>
+            </div>
+        </main>
+
+        <footer class="footer">
+            <div class="footer-content">
+                <span id="fileInfo" class="file-info">No file loaded</span>
+                <span id="statusInfo" class="status-info">Ready</span>
+            </div>
+        </footer>
+    </div>
+
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/konva@9/konva.min.js"></script>
+    <script src="https://unpkg.com/react-konva@18/umd/react-konva.js"></script>
+    <script src="https://unpkg.com/@cyclonedx/cyclonedx-library@2/dist/cyclonedx.umd.js"></script>
+    <script src="app.js"></script>
+</body>
+</html> 
