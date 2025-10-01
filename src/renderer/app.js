@@ -129,7 +129,8 @@ function setupCanvas() {
             }
         }
     });
-    
+
+    // update selection as the mouse moves
     stage.on('mousemove', (e) => {
         if (isSelecting) {
             updateSelection(e);
@@ -137,7 +138,8 @@ function setupCanvas() {
             updatePanning(e);
         }
     });
-    
+
+    // selection of items    
     stage.on('mouseup', (e) => {
         if (isSelecting) {
             endSelection(e);
@@ -145,6 +147,20 @@ function setupCanvas() {
             endPanning(e);
         }
     });
+
+    // zoom canvas in and out w/ mouse wheel
+    stage.on('wheel', (e) => {
+
+        const newScale = stage.scaleX() * (e.evt.deltaY < 0 ? 1.2 : 0.8);
+        
+        stage.scale({x: newScale, y: newScale});
+        const newPos = {
+            x: pointer.x,
+            y: pointer.y 
+        };
+        stage.position(newPos);
+        stage.draw();        // check scroll wheel is up or down
+    })
 }
 
 // File operations
