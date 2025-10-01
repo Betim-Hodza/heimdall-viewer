@@ -302,6 +302,122 @@ body {
     display: none !important;
 }
 
+@media (prefers-color-scheme: dark) {
+
+    body {
+        background: #333;
+        color: #f8f9fa;
+    }
+
+    /* Header */
+    .detail-header {
+        background: rgba(24, 13, 26, 0.95);
+        border-bottom: 1px solid #747474;
+        padding: 1rem 0;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+
+    #detailTitle {
+        font-size: 1.5rem;
+        font-weight: 600;
+        color: #f8f9fa;
+    }
+
+    .btn-primary:hover {
+        background: linear-gradient(135deg, #5a6fd8, #6a4190);
+    }
+
+    .btn-secondary {
+        background: white;
+        color: #495057;
+        border: 1px solid #dee2e6;
+    }
+
+    .btn-secondary:hover {
+        background: #f8f9fa;
+        border-color: #adb5bd;
+    }
+
+    .btn-danger {
+        background: #dc3545;
+        color: white;
+        border: none;
+    }
+
+    .btn-danger:hover {
+        background: #c82333;
+    }
+
+    /* Loading overlay */
+    .loading-overlay {
+        background: rgba(134, 134, 134, 0.9);
+    }
+
+    .form-section {
+        background: #616060;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        border: 1px solid #303030;
+    }
+
+    .form-section h3 {
+        color: #f8f9fa;
+        border-bottom: 2px solid #333;
+    }
+
+    .form-group label {
+        color: #a7afaf;
+    }
+
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+        border: 1px solid #38393a;
+    }
+
+    .form-group input:focus,
+    .form-group select:focus,
+    .form-group textarea:focus {
+        outline: none;
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+
+    .form-group input[readonly] {
+        background-color: #f8f9fa;
+        color: #222222;
+        cursor: not-allowed;
+    }
+
+    .reference-item {
+        background: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 6px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+    }
+
+    .property-item {
+        background: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 6px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+    }
+
+    .property-item:last-child {
+        margin-bottom: 0;
+    }
+
+    /* Footer */
+    .detail-footer {
+        background: rgba(24, 13, 26, 0.95);
+        border-top: 1px solid #dee2e6;
+        padding: 1rem 0;
+    }
+
+}
+
 /* Responsive design */
 @media (max-width: 768px) {
     .header-content {
