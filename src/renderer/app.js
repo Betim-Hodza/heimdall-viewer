@@ -127,8 +127,12 @@ function setupCanvas() {
                 // Regular click starts selection
                 startSelection(e);
             }
+        } else if (e.target === stage && e.evt.button === 1) {
+            // Middle-click pans the canvas
+            startPanning(e);
         }
     });
+
 
     // update selection as the mouse moves
     stage.on('mousemove', (e) => {
