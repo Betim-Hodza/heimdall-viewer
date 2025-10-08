@@ -23,6 +23,7 @@ contextBridge.exposeInMainWorld('heimdallAPI', {
   saveFileAs: (content) => ipcRenderer.invoke('save-file-as', content),
   
   // Window management
+  openVexWindow: (itemData, itemType) => ipcRenderer.invoke('open-vex-window', { itemData, itemType }),
   openDetailWindow: (itemData, itemType) => ipcRenderer.invoke('open-detail-window', { itemData, itemType }),
   updateItem: (itemData, itemType, updatedData) => ipcRenderer.invoke('update-item', { itemData, itemType, updatedData }),
   

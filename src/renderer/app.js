@@ -563,7 +563,7 @@ function renderVulnerabilitiesHierarchy(vulnerability, level, parentX, parentY) 
 }
 
 
-function createComponentBox(vuln, x, y, width, height, level) {
+function createComponentBox(component, x, y, width, height, level) {
     const colors = ['#667eea', '#764ba2', '#f093fb', '#f5576c', '#4facfe', '#00f2fe'];
     const color = colors[level % colors.length];
     
@@ -592,7 +592,7 @@ function createComponentBox(vuln, x, y, width, height, level) {
         x: 10,
         y: 10,
         width: width - 20,
-        text: vuln.vulnerabilities.id || vuln.bomRef || 'Unknown',
+        text: component.name || component.bomRef || 'Unknown',
         fontSize: 14,
         fontFamily: 'Arial',
         fill: '#fff',
@@ -605,7 +605,7 @@ function createComponentBox(vuln, x, y, width, height, level) {
         x: 10,
         y: 35,
         width: width - 20,
-        text: vuln.version || 'No version',
+        text: component.version || 'No version',
         fontSize: 12,
         fontFamily: 'Arial',
         fill: '#fff',
@@ -618,7 +618,7 @@ function createComponentBox(vuln, x, y, width, height, level) {
         x: 10,
         y: 55,
         width: width - 20,
-        text: vuln.type || 'Unknown type',
+        text: component.type || 'Unknown type',
         fontSize: 10,
         fontFamily: 'Arial',
         fill: '#fff',
@@ -632,7 +632,7 @@ function createComponentBox(vuln, x, y, width, height, level) {
     group.add(typeText);
     
     // Store component data
-    group.componentData = vuln;
+    group.componentData = component;
     group.isComponent = true;
     
     // Event handlers
@@ -779,12 +779,12 @@ function createVulnerabilityBox(vuln, x, y, width, height, level) {
     group.add(typeText);
     
     // Store component data
-    group.componentData = vuln;
-    group.isComponent = true;
+    group.vulnData = vuln;
+    group.isVuln = true;
     
     // Event handlers
-    group.on('click', (e) => handleComponentClick(e, group));
-    group.on('dblclick', () => expandComponent(group));
+    group.on('click', (e) => handleVulnClick(e, group));
+    group.on('dblclick', () => expandVulnerability(group));
     group.on('contextmenu', (e) => showContextMenu(e, group));
     group.on('dragstart', () => {
         // Store initial position for multi-selection dragging
@@ -1033,6 +1033,68 @@ function handleComponentClick(e, group) {
     layer.draw();
 }
 
+// Component interactions
+function handleVulnClick(e, group) {
+    // Don't handle clicks if we're in selection mode
+    if (isSelecting) {
+        return;
+    }
+    
+    const isCtrlClick = e.evt.ctrlKey || e.evt.metaKey;
+    
+    if (isCtrlClick) {
+        // Multi-selection with Ctrl/Cmd+click
+        const index = selectedNodes.indexOf(group);
+        if (index > -1) {
+            // Deselect
+            selectedNodes.splice(index, 1);
+            const rect = group.findOne('Rect');
+            if (rect) {
+                rect.stroke('#fff');
+                rect.strokeWidth(2);
+            }
+        } else {
+            // Select
+            selectedNodes.push(group);
+            const rect = group.findOne('Rect');
+            if (rect) {
+                rect.stroke('#ffd700');
+                rect.strokeWidth(3);
+            }
+        }
+        
+        if (selectedNodes.length === 0) {
+            selectedNode = null;
+        } else if (selectedNodes.length === 1) {
+            selectedNode = selectedNodes[0];
+        }
+        
+        showStatus(`Selected ${selectedNodes.length} VEX(s)`);
+    } else {
+        // Single selection
+        // Clear previous selections
+        deselectAll();
+        
+        selectedNodes = [group];
+        selectedNode = group;
+        
+        const rect = group.findOne('Rect');
+        if (rect) {
+            rect.stroke('#ffd700');
+            rect.strokeWidth(3);
+        }
+        
+        if (group.isSBOMRoot) {
+            showStatus(`Selected: SBOM (${sbomData.vulnerabilities ? sbomData.vulnerabilities.length : 0} VEX)`);
+        } else {
+            showStatus(`Selected: ${group.vulnData.nameText || group.vulnData.bomRef}`);
+        }
+    }
+    
+    layer.draw();
+}
+
+
 function expandSBOM(group) {
     console.log('Expanding SBOM');
     sbomExpanded = true;
@@ -1140,6 +1202,22 @@ function expandComponent(group) {
         window.heimdallAPI.openDetailWindow(component, 'component');
     }
 }
+
+function expandVulnerability(group) {
+    const vuln = group.vulnData;
+    console.log('Expanding vuln:', vuln);
+    console.log(vuln)
+    
+    // First, ensure SBOM is expanded
+    if (!sbomExpanded) {
+        sbomExpanded = true;
+        showStatus('SBOM expanded to show vulns');
+    }
+
+    
+    window.heimdallAPI.openVexWindow(vuln, "vex");
+}
+
 
 // Context menu
 function showContextMenu(e, group) {
