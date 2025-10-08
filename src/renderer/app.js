@@ -202,7 +202,8 @@ async function loadSBOM(content) {
             bomFormat: data.bomFormat,
             specVersion: data.specVersion,
             hasComponents: !!data.components,
-            componentCount: data.components ? data.components.length : 0
+            componentCount: data.components ? data.components.length : 0,
+            vulnerabilitiesCount: data.vulnerabilities ? data.vulnerabilities.length : 0
         });
         
         // Validate CycloneDX format
@@ -342,7 +343,11 @@ function renderSBOM() {
     if (sbomExpanded && sbomData.components && sbomData.components.length > 0) {
         console.log('Rendering components hierarchy');
         renderComponentsHierarchy(sbomData.components, 1, stage.width() / 2, 200);
-    } else {
+    } else if (sbomData.vulnerabilities && sbomData.vulnerabilities.length > 0) {
+        console.log('Rendering vulnerabilities hierarchy')
+        renderVulnerabilitiesHierarchy(sbomData.vulnerabilities, 1, stage.width() / 2, 200);
+    }
+    else {
         console.log('Not rendering components - sbomExpanded:', sbomExpanded);
     }
     
@@ -467,7 +472,98 @@ function renderComponentsHierarchy(components, level, parentX, parentY) {
     });
 }
 
-function createComponentBox(component, x, y, width, height, level) {
+function renderVulnerabilitiesHierarchy(vulnerability, level, parentX, parentY) {
+    console.log('renderVulnerabilitiesHierarchy called - level:', level, 'sbomExpanded:', sbomExpanded);
+    if (!vulnerability || vulnerability.length === 0) return;
+    
+    // Don't render any vuln if SBOM is not expanded
+    if (!sbomExpanded) {
+        console.log('SBOM not expanded, not rendering any vulnerabilities');
+        return;
+    }
+    
+    const boxWidth = 200;
+    const boxHeight = 80;
+    const spacing = 50;
+    const levelHeight = 120;
+    const totalWidth = vulnerability.length * (boxWidth + spacing) - spacing;
+    
+    // Calculate start position, ensuring it stays within canvas bounds
+    let startXPos = parentX - totalWidth / 2;
+    const canvasWidth = stage.width();
+    const canvasHeight = stage.height();
+    
+    // Ensure vuln don't go off the left edge
+    if (startXPos < 20) {
+        startXPos = 20;
+    }
+    
+    // Ensure vuln don't go off the right edge
+    if (startXPos + totalWidth > canvasWidth - 20) {
+        startXPos = canvasWidth - totalWidth - 20;
+    }
+    
+    // If vuln are too wide for the canvas, reduce spacing
+    if (totalWidth > canvasWidth - 40) {
+        const reducedSpacing = Math.max(10, (canvasWidth - 40 - vulnerability.length * boxWidth) / (vulnerability.length - 1));
+        const newTotalWidth = vulnerability.length * (boxWidth + reducedSpacing) - reducedSpacing;
+        startXPos = parentX - newTotalWidth / 2;
+    }
+    
+    // Ensure we don't go off the bottom edge
+    const y = Math.min(parentY, canvasHeight - boxHeight - 20);
+    
+    // Calculate actual spacing (may be reduced if vuln are too wide)
+    const actualSpacing = totalWidth > canvasWidth - 40 ? 
+        Math.max(10, (canvasWidth - 40 - vulnerability.length * boxWidth) / (vulnerability.length - 1)) : 
+        spacing;
+    
+    // Create all connection lines first (so they render behind vuln)
+    const lines = [];
+    vulnerability.forEach((vulnerability, index) => {
+        const x = startXPos + index * (boxWidth + actualSpacing);
+        
+        // Create connection line from parent to this component
+        // For SBOM root, connect to bottom center of SBOM box (SBOM is at y=50, so bottom is at y+100=150)
+        // For vuln, connect to bottom center of parent component (parentY is the top, so bottom is parentY + 80)
+        const parentEndY = level === 1 ? 150 : parentY;
+        const line = new Konva.Line({
+            points: [parentX, parentEndY, x + boxWidth / 2, y],
+            stroke: '#667eea',
+            strokeWidth: 2,
+            opacity: 0.6
+        });
+        lines.push({ line, x, index });
+    });
+    
+    // Add all lines to layer first (they will be behind vuln)
+    lines.forEach(({ line }) => {
+        layer.add(line);
+    });
+    
+    // Now create and add vuln (they will be on top of lines)
+    vulnerability.forEach((vuln, index) => {
+        const x = startXPos + index * (boxWidth + actualSpacing);
+        const vulnBox = createVulnerabilityBox(vuln, x, y, boxWidth, boxHeight, level);
+        layer.add(vulnBox);
+        
+        // Store reference to line for dynamic updates
+        vulnBox.connectionLine = lines[index].line;
+        vulnBox.parentX = parentX;
+        vulnBox.parentY = parentY;
+        vulnBox.level = level;
+        
+        // Add drag event to update line position
+        vulnBox.on('dragmove', () => {
+            updateConnectionLine(vulnBox);
+        });
+        
+        
+    });
+}
+
+
+function createComponentBox(vuln, x, y, width, height, level) {
     const colors = ['#667eea', '#764ba2', '#f093fb', '#f5576c', '#4facfe', '#00f2fe'];
     const color = colors[level % colors.length];
     
@@ -496,7 +592,7 @@ function createComponentBox(component, x, y, width, height, level) {
         x: 10,
         y: 10,
         width: width - 20,
-        text: component.name || component.bomRef || 'Unknown',
+        text: vuln.vulnerabilities.id || vuln.bomRef || 'Unknown',
         fontSize: 14,
         fontFamily: 'Arial',
         fill: '#fff',
@@ -509,7 +605,7 @@ function createComponentBox(component, x, y, width, height, level) {
         x: 10,
         y: 35,
         width: width - 20,
-        text: component.version || 'No version',
+        text: vuln.version || 'No version',
         fontSize: 12,
         fontFamily: 'Arial',
         fill: '#fff',
@@ -522,7 +618,7 @@ function createComponentBox(component, x, y, width, height, level) {
         x: 10,
         y: 55,
         width: width - 20,
-        text: component.type || 'Unknown type',
+        text: vuln.type || 'Unknown type',
         fontSize: 10,
         fontFamily: 'Arial',
         fill: '#fff',
@@ -536,7 +632,154 @@ function createComponentBox(component, x, y, width, height, level) {
     group.add(typeText);
     
     // Store component data
-    group.componentData = component;
+    group.componentData = vuln;
+    group.isComponent = true;
+    
+    // Event handlers
+    group.on('click', (e) => handleComponentClick(e, group));
+    group.on('dblclick', () => expandComponent(group));
+    group.on('contextmenu', (e) => showContextMenu(e, group));
+    group.on('dragstart', () => {
+        // Store initial position for multi-selection dragging
+        group.setAttr('lastX', group.x());
+        group.setAttr('lastY', group.y());
+    });
+    group.on('dragmove', () => {
+        // If this component is part of a selection, move all selected components together
+        if (selectedNodes.length > 1 && selectedNodes.includes(group)) {
+            const dx = group.x() - group.getAttr('lastX');
+            const dy = group.y() - group.getAttr('lastY');
+            
+            selectedNodes.forEach(selectedNode => {
+                if (selectedNode !== group) {
+                    const newX = selectedNode.x() + dx;
+                    const newY = selectedNode.y() + dy;
+                    
+                    // Constrain to canvas boundaries
+                    const maxX = stage.width() - width;
+                    const maxY = stage.height() - height;
+                    
+                    selectedNode.x(Math.max(0, Math.min(maxX, newX)));
+                    selectedNode.y(Math.max(0, Math.min(maxY, newY)));
+                    
+                    updateConnectionLine(selectedNode);
+                }
+            });
+        }
+        
+        // Constrain the dragged component to canvas boundaries
+        const x = group.x();
+        const y = group.y();
+        const maxX = stage.width() - width;
+        const maxY = stage.height() - height;
+        
+        if (x < 0) group.x(0);
+        if (y < 0) group.y(0);
+        if (x > maxX) group.x(maxX);
+        if (y > maxY) group.y(maxY);
+        
+        // Store current position for next drag move
+        group.setAttr('lastX', group.x());
+        group.setAttr('lastY', group.y());
+        
+        updateConnectionLine(group);
+    });
+    group.on('mouseenter', () => {
+        document.body.style.cursor = 'pointer';
+        rect.shadowBlur(20);
+        layer.draw();
+    });
+    group.on('mouseleave', () => {
+        document.body.style.cursor = 'default';
+        rect.shadowBlur(10);
+        layer.draw();
+    });
+    
+    return group;
+}
+
+function createVulnerabilityBox(vuln, x, y, width, height, level) {
+    const colors = ['#667eea', '#764ba2', '#f093fb', '#f5576c', '#4facfe', '#00f2fe'];
+    const color = colors[level % colors.length];
+    
+    const group = new Konva.Group({
+        x: x,
+        y: y,
+        draggable: true
+    });
+
+    console.log(vuln)
+
+
+
+    // Background rectangle
+    const rect = new Konva.Rect({
+        width: width,
+        height: height,
+        fill: color,
+        stroke: '#fff',
+        strokeWidth: 2,
+        cornerRadius: 8,
+        shadowColor: 'rgba(0,0,0,0.3)',
+        shadowBlur: 10,
+        shadowOffset: { x: 0, y: 4 },
+        shadowOpacity: 0.3
+    });
+    
+    // CVE ID
+    const nameText = new Konva.Text({
+        x: 10,
+        y: 10,
+        width: width - 20,
+        text: vuln.id || 'Unknown',
+        fontSize: 14,
+        fontFamily: 'Arial',
+        fill: '#fff',
+        fontWeight: 'bold',
+        align: 'center'
+    });
+
+    // Vulnerability State
+    const versionText = new Konva.Text({
+        x: 10,
+        y: 35,
+        width: width - 20,
+        text: vuln.analysis.state || 'No State',
+        fontSize: 12,
+        fontFamily: 'Arial',
+        fill: '#fff',
+        align: 'center',
+        opacity: 0.9
+    });
+    
+
+    // avg rating calculation
+    sum_rating = 0;
+    for (var i = 0; i < vuln.ratings.length; i++) {
+        sum_rating += vuln.ratings[i].score;
+    }
+    average_rating = sum_rating / vuln.ratings.length;
+
+    // Vulnerability Rating
+    const typeText = new Konva.Text({
+        x: 10,
+        y: 55,
+        width: width - 20,
+        text: "average rating: " + average_rating.toFixed(2) || 'Unknown rating',
+        fontSize: 10,
+        fontFamily: 'Arial',
+        fill: '#fff',
+        align: 'center',
+        opacity: 0.8
+    });
+    
+    group.add(rect);
+    group.add(nameText);
+    group.add(versionText);
+    group.add(typeText);
+    
+    // Store component data
+    group.componentData = vuln;
     group.isComponent = true;
     
     // Event handlers
@@ -663,9 +906,22 @@ function createSBOMBox(centerX, y) {
     // Component count
     const countText = new Konva.Text({
         x: 10,
-        y: 70,
+        y: 65,
         width: width - 20,
         text: `${sbomData.components ? sbomData.components.length : 0} Components`,
+        fontSize: 12,
+        fontFamily: 'Arial',
+        fill: '#fff',
+        align: 'center',
+        opacity: 0.8
+    });
+
+    // Vuln count
+    const vulnCount = new Konva.Text({
+        x: 10,
+        y: 80,
+        width: width - 20,
+        text: `${sbomData.vulnerabilities ? sbomData.vulnerabilities.length : 0} VEX`,
         fontSize: 12,
         fontFamily: 'Arial',
         fill: '#fff',
@@ -677,6 +933,7 @@ function createSBOMBox(centerX, y) {
     group.add(titleText);
     group.add(metadataText);
     group.add(countText);
+    group.add(vulnCount);
     
     // Store SBOM data
     group.sbomData = sbomData;
@@ -1391,7 +1648,6 @@ function updateSelection(e) {
     const stageEndY = Math.max(selectionStartPos.y, pos.y);
     updateSelectionFromBox(stageStartX, stageStartY, stageEndX, stageEndY);
     
-    layer.draw();
 }
 
 function endSelection(e) {
@@ -1399,10 +1655,15 @@ function endSelection(e) {
     
     // Finalize the selection based on the current box
     const pos = stage.getPointerPosition();
-    const startX = Math.min(selectionStartPos.x, pos.x);
-    const startY = Math.min(selectionStartPos.y, pos.y);
-    const endX = Math.max(selectionStartPos.x, pos.x);
-    const endY = Math.max(selectionStartPos.y, pos.y);
+    const layerTransform = layer.getTransform().copy().invert();
+    const layerPos = layerTransform.point(pos);
+    const layerStartPos = layerTransform.point(selectionStartPos);
+
+
+    const startX = Math.min(layerStartPos.x, layerPos.x);
+    const startY = Math.min(layerStartPos.y, layerPos.y);
+    const endX = Math.max(layerStartPos.x, layerPos.x);
+    const endY = Math.max(layerStartPos.y, layerPos.y);
     
     // Final update of selection
     updateSelectionFromBox(startX, startY, endX, endY);
@@ -1445,7 +1706,13 @@ function updatePanning(e) {
     // Update the pan start position for the next move
     panStartPos = pos;
     
-    layer.draw();
+      // Debounce layer.draw() calls
+    if (!layerDrawTimeout) {
+        layerDrawTimeout = setTimeout(() => {
+        layer.draw();
+        layerDrawTimeout = null;
+        }, 16); // 16ms = approximately 60fps
+    }
 }
 
 function endPanning(e) {
