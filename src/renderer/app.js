@@ -699,7 +699,7 @@ function createComponentBox(component, x, y, width, height, level) {
 }
 
 function createVulnerabilityBox(vuln, x, y, width, height, level) {
-    const colors = ['#667eea', '#764ba2', '#f093fb', '#f5576c', '#4facfe', '#00f2fe'];
+    const colors = ['#6e89ffff', '#bb78ffff', '#f9c7ffff', '#ff8393ff', '#88c8ffff', '#8bf9ffff'];
     const color = colors[level % colors.length];
     
     const group = new Konva.Group({
@@ -1094,6 +1094,57 @@ function handleVulnClick(e, group) {
     layer.draw();
 }
 
+function addVexToTarget(target) {
+    // load in sbom
+    console.log("adding vex to target " + target);
+    if (!sbomData) {
+        showError('No SBOM loaded – cannot add a VEX entry');
+        console.log("Error no sbom loaded");
+        return;
+    }
+    if (!Array.isArray(sbomData.vulnerabilities)) {
+        sbomData.vulnerabilities = [];
+    }
+
+    // Build an empty vex file 
+    const ts = new Date().toISOString().split('T')[0];   // YYYY‑MM‑DD
+    const newVuln = {
+        id:            `VULN-${Date.now()}`,   // temporary id – can be edited later
+        source:         { name: 'Custom', url: '' },
+        description:   '',
+        detail:        '',
+        recommendation:'',
+        created:       ts,
+        published:     ts,
+        updated:       ts,
+        analysis: {
+            state:        'reported',
+            justification:'',
+            response:     [],
+            detail:       ''
+        },
+        credits:       { individuals: [] },
+        cwes:          [],
+        advisories:    [],
+        references:    [],
+        ratings:       [],
+        affects:       []          // will be filled if we have a component target
+    };
+
+    // try to use bomref first
+    if (target && target.componentData) {
+        const comp = target.componentData;
+        const ref  = comp.bomRef || comp.name || `component-${Date.now()}`;
+        newVuln.affects.push({ ref });
+    }
+-
+    sbomData.vulnerabilities.push(newVuln);
+    renderSBOM();                         // refresh the view
+    showStatus(`Added new vulnerability ${newVuln.id}`);
+
+    // open to start adding
+    window.heimdallAPI.openVexWindow(newVuln, 'vex');
+}
 
 function expandSBOM(group) {
     console.log('Expanding SBOM');
@@ -1289,6 +1340,9 @@ function handleContextMenuClick(e) {
                 navigator.clipboard.writeText('SBOM');
                 showStatus('SBOM reference copied to clipboard');
                 break;
+            case 'addVex':
+                // need to create a new vulnerabilities part in reference to this specific component
+                addVexToTarget(null);
         }
     } else {
         // Handle component actions
@@ -1314,6 +1368,9 @@ function handleContextMenuClick(e) {
                 navigator.clipboard.writeText(component.bomRef || component.name);
                 showStatus('Component ID copied to clipboard');
                 break;
+            case 'addVex':
+                // need to create a new vulnerabilities part in reference to this specific component
+                addVexToTarget(contextMenu);
         }
     }
     
@@ -1573,21 +1630,68 @@ function showError(message) {
 
 // Listen for item updates from detail windows
 window.heimdallAPI.onItemUpdated((data) => {
-    // Update the component in the main view
-    if (sbomData && data.itemData) {
-        const componentIndex = sbomData.components.findIndex(
-            comp => comp.bomRef === data.itemData.bomRef
-        );
-        
-        if (componentIndex !== -1) {
-            sbomData.components[componentIndex] = { ...data.itemData, ...data.updatedData };
-            renderSBOM();
-            showStatus('Component updated');
-            
-            // Auto-save changes back to file
-            saveChangesToFile();
-        }
+
+    // Bail out early if we don't have a SBOM loaded
+    if (!sbomData) {
+        console.warn('onItemUpdated received but no SBOM is loaded');
+        return;
     }
+
+    // component updates
+    if (data.itemType === 'component') {
+        const compIdx = sbomData.components?.findIndex(
+            c => c.bomRef === data.itemData.bomRef
+        );
+
+        if (compIdx >= 0) {
+            sbomData.components[compIdx] = {
+                ...sbomData.components[compIdx],
+                ...data.itemData
+            };
+            showStatus('Component updated');
+        } else {
+            console.warn('Component not found in SBOM during update', data.itemData);
+        }
+
+        // vex updates
+    } else if (data.itemType === 'vex') {
+        // Ensure the SBOM actually has a vulnerabilities array
+        if (!Array.isArray(sbomData.vulnerabilities)) {
+            sbomData.vulnerabilities = [];
+        }
+
+        // Find the vulnerability by its **id** (the only unique key we have)
+        const vexIdx = sbomData.vulnerabilities.findIndex(v => v.id === data.itemData.id);
+
+        if (vexIdx >= 0) {
+            // Replace the existing entry with the newly‑saved one
+            sbomData.vulnerabilities[vexIdx] = {
+                ...sbomData.vulnerabilities[vexIdx],
+                ...data.itemData
+            };
+            showStatus(`VEX "${data.itemData.id}" updated`);
+        } else {
+            // If the VEX entry does not exist yet (should not happen for an edit,
+            // but it covers the “add new VEX” case when the canvas was not expanded)
+            sbomData.vulnerabilities.push(data.itemData);
+            showStatus(`VEX "${data.itemData.id}" added`);
+        }
+
+        // Force the VEX hierarchy to be visible – otherwise the canvas may
+        // still be showing the component view only.
+        if (!sbomExpanded) {
+            sbomExpanded = true;                 // expand the SBOM automatically
+            showStatus('SBOM expanded – VEX now visible');
+        }
+
+
+    } else {
+        console.warn('onItemUpdated received unknown itemType', data.itemType);
+    }
+
+    renderSBOM();
+
+    saveChangesToFile();
 });
 
 // Save changes back to the original file
@@ -1784,13 +1888,7 @@ function updatePanning(e) {
     // Update the pan start position for the next move
     panStartPos = pos;
     
-      // Debounce layer.draw() calls
-    if (!layerDrawTimeout) {
-        layerDrawTimeout = setTimeout(() => {
-        layer.draw();
-        layerDrawTimeout = null;
-        }, 16); // 16ms = approximately 60fps
-    }
+
 }
 
 function endPanning(e) {

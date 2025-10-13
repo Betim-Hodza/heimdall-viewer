@@ -302,31 +302,6 @@ body {
     display: none !important;
 }
 
-/*For vex content*/
-.vex-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 0.6rem;
-    margin-bottom: 1rem;
-}
-.list-container .list-row {
-    margin:4px 0;
-}
-.list-label {
-    font-weight:600;
-    margin-right:0.5rem;
-}
-.loading-overlay {
-    position: absolute;
-    inset:0;
-    background:rgba(255,255,255,0.8);
-    display:flex;
-    flex-direction:column;
-    align-items:center;
-    justify-content:center;
-    z-index:10;
-}
-
 @media (prefers-color-scheme: dark) {
 
     body {

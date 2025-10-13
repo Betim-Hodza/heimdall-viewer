@@ -31,9 +31,10 @@ function createMainWindow() {
       preload: path.join(__dirname, 'preload.js')
     },
     title: 'Heimdall Viewer',
-    icon: path.join(__dirname, 'assets', 'icon.png')
+    icon: path.join(__dirname, 'assets', 'images', 'icon.png') // assuming this is in the top left
   });
 
+  // load in html file on startup
   mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
 
   if (process.argv.includes('--dev')) {
@@ -45,6 +46,7 @@ function createMainWindow() {
   });
 }
 
+// when you double click a component a detialed window pops up
 function createDetailWindow(itemData, itemType) {
   const detailWindow = new BrowserWindow({
     width: 800,
@@ -53,7 +55,7 @@ function createDetailWindow(itemData, itemType) {
       nodeIntegration: false,
       contextIsolation: true,
       preload: path.join(__dirname, 'preload.js')
-    },
+    }, 
     title: `${itemType} Details - ${itemData.name || itemData.id || 'Unknown'}`,
     parent: mainWindow,
     modal: false
@@ -74,6 +76,37 @@ function createDetailWindow(itemData, itemType) {
 
   return windowId;
 }
+
+function createVexWindow(itemData, itemType) {
+  const detailWindow = new BrowserWindow({
+    width: 800,
+    height: 600,
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      preload: path.join(__dirname, 'preload.js')
+    }, 
+    title: `${itemType} Details - ${itemData.name || itemData.id || 'Unknown'}`,
+    parent: mainWindow,
+    modal: false
+  });
+
+  detailWindow.loadFile(path.join(__dirname, 'renderer', 'vex.html'));
+  
+  detailWindow.webContents.on('did-finish-load', () => {
+    detailWindow.webContents.send('item-data', { itemData, itemType });
+  });
+
+  const windowId = Date.now().toString();
+  detailWindows.set(windowId, detailWindow);
+
+  detailWindow.on('closed', () => {
+    detailWindows.delete(windowId);
+  });
+
+  return windowId;
+}
+
 
 app.whenReady().then(() => {
   createMainWindow();
@@ -144,6 +177,10 @@ ipcMain.handle('save-file-as', async (event, content) => {
 
 ipcMain.handle('open-detail-window', async (event, { itemData, itemType }) => {
   return createDetailWindow(itemData, itemType);
+});
+
+ipcMain.handle('open-vex-window', async (event, { itemData, itemType }) => {
+  return createVexWindow(itemData, itemType);
 });
 
 ipcMain.handle('update-item', async (event, { itemData, itemType, updatedData }) => {

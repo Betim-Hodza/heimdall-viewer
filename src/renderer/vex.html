@@ -21,22 +21,51 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VEX Details – Heimdall Viewer</title>
     <link rel="stylesheet" href="detail-styles.css">
+    <style>
+        /* -----------------------------------------------------------------
+           Minimal styling for the VEX‑only view – you can move these rules
+           to detail‑styles.css if you prefer.
+        ----------------------------------------------------------------- */
+        .vex-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 0.6rem;
+            margin-bottom: 1rem;
+        }
+        .list-container .list-row {
+            margin:4px 0;
+        }
+        .list-label {
+            font-weight:600;
+            margin-right:0.5rem;
+        }
+        .loading-overlay {
+            position: absolute;
+            inset:0;
+            background:rgba(255,255,255,0.8);
+            display:flex;
+            flex-direction:column;
+            align-items:center;
+            justify-content:center;
+            z-index:10;
+        }
+    </style>
 </head>
 <body>
 <div id="detailApp">
 
+  <!-- ==================== HEADER ==================== -->
     <header class="detail-header">
         <div class="header-content">
             <h2 id="detailTitle">VEX Details</h2>
             <div class="toolbar">
-                <button id="closeBtn" class="btn btn-secondary">
-                    <span class="icon">✕</span> Close
-                </button>
+                <button id="saveBtn" class="btn save"><span class="icon">💾</span> Save</button>
+                <button id="closeBtn" class="btn cancel"><span class="icon">✕</span> Close</button>
             </div>
         </div>
     </header>
 
-    <!-- Main area -->
+    <!-- ==================== MAIN ==================== -->
     <main class="detail-content">
         <!-- Loading spinner -->
         <div id="loadingOverlay" class="loading-overlay hidden">
@@ -51,11 +80,28 @@
             <section class="form-section">
                 <h3>Core Information</h3>
                 <div class="vex-grid">
-                    <div class="vex-item"><strong>ID:</strong> <span id="vexId"></span></div>
-                    <div class="vex-item"><strong>Source:</strong> <span id="vexSource"></span></div>
-                    <div class="vex-item"><strong>Created:</strong> <span id="vexCreated"></span></div>
-                    <div class="vex-item"><strong>Published:</strong> <span id="vexPublished"></span></div>
-                    <div class="vex-item"><strong>Updated:</strong> <span id="vexUpdated"></span></div>
+                    <div class="vex-item">
+                        <strong>ID:</strong>
+                        <input type="text" id="vexId">
+                    </div>
+                    <div class="vex-item">
+                        <strong>Source Name:</strong>
+                        <input type="text" id="vexSourceName">
+                        <strong>Source URL:</strong>
+                        <input type="url" id="vexSourceUrl" placeholder="https://…">
+                    </div>
+                    <div class="vex-item">
+                        <strong>Created:</strong>
+                        <input type="datetime-local" id="vexCreated">
+                    </div>
+                    <div class="vex-item">
+                        <strong>Published:</strong>
+                        <input type="datetime-local" id="vexPublished">
+                    </div>
+                    <div class="vex-item">
+                        <strong>Updated:</strong>
+                        <input type="datetime-local" id="vexUpdated">
+                    </div>
                 </div>
             </section>
 
@@ -63,24 +109,54 @@
             <section class="form-section">
                 <h3>Description & Detail</h3>
                 <div class="vex-grid">
-                    <div class="vex-item"><strong>Description:</strong> <span id="vexDescription"></span></div>
-                    <div class="vex-item"><strong>Detail:</strong> <span id="vexDetail"></span></div>
-                    <div class="vex-item"><strong>Recommendation:</strong> <span id="vexRecommendation"></span></div>
+                    <div class="vex-item">
+                        <strong>Description:</strong>
+                        <textarea id="vexDescription" rows="3"></textarea>
+                    </div>
+                    <div class="vex-item">
+                        <strong>Detail:</strong>
+                        <textarea id="vexDetail" rows="4"></textarea>
+                    </div>
+                    <div class="vex-item">
+                        <strong>Recommendation:</strong>
+                        <textarea id="vexRecommendation" rows="2"></textarea>
+                    </div>
                 </div>
             </section>
 
             <!-- ---------- Analysis ---------- -->
             <section class="form-section">
                 <h3>Analysis</h3>
-                <div class="vex-item"><strong>Analysis:</strong> <span id="vexAnalysis"></span></div>
+                <div class="vex-item">
+                    <strong>State:</strong>
+                    <select id="vexAnalysisState">
+                        <option value="">Select state…</option>
+                        <option value="not_affected">Not Affected</option>
+                        <option value="affected">Affected</option>
+                        <option value="fixed">Fixed</option>
+                        <option value="under_investigation">Under Investigation</option>
+                    </select>
+                    <strong>Justification:</strong>
+                    <input type="text" id="vexAnalysisJustification">
+                    <strong>Response (comma‑separated):</strong>
+                    <input type="text" id="vexAnalysisResponse" placeholder="e.g. will_not_fix, update">
+                    <strong>Detail:</strong>
+                    <textarea id="vexAnalysisDetail" rows="2"></textarea>
+                </div>
             </section>
 
             <!-- ---------- Credits & CWEs ---------- -->
             <section class="form-section">
                 <h3>Credits & CWEs</h3>
                 <div class="vex-grid">
-                    <div class="vex-item"><strong>Credits:</strong> <span id="vexCredits"></span></div>
-                    <div class="vex-item"><strong>CWEs:</strong> <span id="vexCwes"></span></div>
+                    <div class="vex-item">
+                        <strong>Credits (comma‑separated names):</strong>
+                        <input type="text" id="vexCredits">
+                    </div>
+                    <div class="vex-item">
+                        <strong>CWEs (comma‑separated IDs):</strong>
+                        <input type="text" id="vexCwes" placeholder="e.g. 611, 787">
+                    </div>
                 </div>
             </section>
 
@@ -90,7 +166,7 @@
                 <div id="advisoriesContainer" class="list-container"></div>
             </section>
 
-            <section class="form-section">                
+            <section class="form-section">
                 <h3>References</h3>
                 <div id="referencesContainer" class="list-container"></div>
             </section>
@@ -108,7 +184,7 @@
         </div> <!-- /detailForm -->
     </main>
 
-    
+    <!-- ==================== FOOTER ==================== -->
     <footer class="detail-footer">
         <div class="footer-content">
             <span id="statusInfo" class="status-info">Ready</span>
@@ -116,9 +192,9 @@
         </div>
     </footer>
 
-</div> 
+</div> <!-- /detailApp -->
 
-
+<!-- Load the VEX‑specific script (not detail.js) -->
 <script src="vex.js"></script>
 </body>
 </html>
