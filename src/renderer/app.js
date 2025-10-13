@@ -1331,7 +1331,7 @@ function updateConnectionLine(componentBox) {
 function updateSBOMConnectionLines(sbomBox) {
     // Find all components that connect to this SBOM box (level 1 components)
     layer.children.forEach(child => {
-        if (child.componentData && child.level === 1 && child.connectionLine) {
+        if ( (child.componentData || child.vulnData) && child.level === 1 && child.connectionLine) {
             // Update the parent end point to the new SBOM box position
             const sbomX = sbomBox.x() + 150; // SBOM box center X
             const sbomY = sbomBox.y() + 100; // SBOM box bottom Y
