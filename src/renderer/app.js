@@ -242,7 +242,8 @@ function parseXMLSBOM(xmlContent) {
         bomFormat: bom.getAttribute('bomFormat') || 'CycloneDX',
         specVersion: bom.getAttribute('specVersion') || '1.4',
         metadata: parseMetadata(xmlDoc),
-        components: parseComponents(xmlDoc)
+        components: parseComponents(xmlDoc),
+        vulnerabilities: parseVulnerabilities(xmlDoc)
     };
 }
 
@@ -270,6 +271,29 @@ function parseComponents(xmlDoc) {
         bomRef: comp.getAttribute('bom-ref')
     }));
 }
+
+function parseVulnerabilities(xmlDoc) {
+    const vulns = xmlDoc.querySelectorAll('vulnerabilities');
+    console.log(vulns);
+    return Array.from(vulns).map(vuln => ({
+        id: vuln.querySelector('id')?.textContent,
+        source: vuln.querySelector('source')?.textContent,
+        references: vuln.querySelector('references')?.textContent,
+        ratings: vuln.querySelector('ratings')?.textContent,
+        cwe: vuln.querySelector('cwe')?.textContent,
+        description: vuln.querySelector('description')?.textContent,
+        detail: vuln.querySelector('detail')?.textContent,
+        recommendation: vuln.querySelector('recommendation')?.textContent,
+        advisories: vuln.querySelector('advisories')?.textContent,
+        created: vuln.querySelector('created')?.textContent,
+        published: vuln.querySelector('published')?.textContent,
+        updated: vuln.querySelector('updated')?.textContent,
+        credits: vuln.querySelector('credits')?.textContent,
+        analysis: vuln.querySelector('analysis')?.textContent,
+        affects: vuln.querySelector('affects')?.textContent,
+    }));
+}
+
 
 async function saveFile() {
     if (!currentFile || !sbomData) return;
@@ -430,8 +454,8 @@ function renderHierarchy(items, level, parentX, parentY, type) {
 
         // the actual box (different factory per type)
         const box = (type === 'component')
-            ? createComponentBox(item, x, y, boxWidth, boxHeight, level)
-            : createVulnerabilityBox(item, x, y, boxWidth, boxHeight, level);
+            ? createSubBox(item, x, y, boxWidth, boxHeight, level, type)
+            : createSubBox(item, x, y, boxWidth, boxHeight, level, type);
 
         // keep a reference to the line for drag updates
         box.connectionLine = line;
@@ -451,7 +475,7 @@ function renderHierarchy(items, level, parentX, parentY, type) {
             if (dependent.length) {
                 renderHierarchy(dependent, level + 1,
                     x + boxWidth / 2, y + boxHeight + levelHeight,
-                    'component');
+                    type);
             }
         }
 
@@ -459,10 +483,12 @@ function renderHierarchy(items, level, parentX, parentY, type) {
     });
 }
 
-
-function createComponentBox(component, x, y, width, height, level) {
-    const colors = ['#667eea', '#764ba2', '#f093fb', '#f5576c', '#4facfe', '#00f2fe'];
-    const color = colors[level % colors.length];
+function createSubBox(item, x, y, width, height, level, type) {
+    const compColors = ['#667eea', '#764ba2', '#f093fb', '#f5576c', '#4facfe', '#00f2fe'];
+    const vulnColors = ['#6e89ffff', '#bb78ffff', '#f9c7ffff', '#ff8393ff', '#88c8ffff', '#8bf9ffff'];
+    // pick color based on type and level
+    const color = type === "component" ? compColors[level % compColors.length] : vulnColors[level % vulnColors.length];
+    
     
     const group = new Konva.Group({
         x: x,
@@ -483,206 +509,122 @@ function createComponentBox(component, x, y, width, height, level) {
         shadowOffset: { x: 0, y: 4 },
         shadowOpacity: 0.3
     });
-    
-    // Component name
-    const nameText = new Konva.Text({
-        x: 10,
-        y: 10,
-        width: width - 20,
-        text: component.name || component.bomRef || 'Unknown',
-        fontSize: 14,
-        fontFamily: 'Arial',
-        fill: '#fff',
-        fontWeight: 'bold',
-        align: 'center'
-    });
-    
-    // Component version
-    const versionText = new Konva.Text({
-        x: 10,
-        y: 35,
-        width: width - 20,
-        text: component.version || 'No version',
-        fontSize: 12,
-        fontFamily: 'Arial',
-        fill: '#fff',
-        align: 'center',
-        opacity: 0.9
-    });
-    
-    // Component type
-    const typeText = new Konva.Text({
-        x: 10,
-        y: 55,
-        width: width - 20,
-        text: component.type || 'Unknown type',
-        fontSize: 10,
-        fontFamily: 'Arial',
-        fill: '#fff',
-        align: 'center',
-        opacity: 0.8
-    });
-    
-    group.add(rect);
-    group.add(nameText);
-    group.add(versionText);
-    group.add(typeText);
-    
-    // Store component data
-    group.componentData = component;
-    group.isComponent = true;
-    
-    // Event handlers
-    group.on('click', (e) => handleComponentClick(e, group));
-    group.on('dblclick', () => expandComponent(group));
-    group.on('contextmenu', (e) => showContextMenu(e, group));
-    group.on('dragstart', () => {
-        // Store initial position for multi-selection dragging
-        group.setAttr('lastX', group.x());
-        group.setAttr('lastY', group.y());
-    });
-    group.on('dragmove', () => {
-        // If this component is part of a selection, move all selected components together
-        if (selectedNodes.length > 1 && selectedNodes.includes(group)) {
-            const dx = group.x() - group.getAttr('lastX');
-            const dy = group.y() - group.getAttr('lastY');
-            
-            selectedNodes.forEach(selectedNode => {
-                if (selectedNode !== group) {
-                    const newX = selectedNode.x() + dx;
-                    const newY = selectedNode.y() + dy;
-                    
-                    // Constrain to canvas boundaries
-                    const maxX = stage.width() - width;
-                    const maxY = stage.height() - height;
-                    
-                    selectedNode.x(Math.max(0, Math.min(maxX, newX)));
-                    selectedNode.y(Math.max(0, Math.min(maxY, newY)));
-                    
-                    updateConnectionLine(selectedNode);
-                }
-            });
+    if (type === "component") {
+        // Component name
+        const nameText = new Konva.Text({
+            x: 10,
+            y: 10,
+            width: width - 20,
+            text: item.name || item.bomRef || 'Unknown',
+            fontSize: 14,
+            fontFamily: 'Arial',
+            fill: '#fff',
+            fontWeight: 'bold',
+            align: 'center'
+        });
+        
+        // Component version
+        const versionText = new Konva.Text({
+            x: 10,
+            y: 35,
+            width: width - 20,
+            text: item.version || 'No version',
+            fontSize: 12,
+            fontFamily: 'Arial',
+            fill: '#fff',
+            align: 'center',
+            opacity: 0.9
+        });
+        
+        // Component type
+        const typeText = new Konva.Text({
+            x: 10,
+            y: 55,
+            width: width - 20,
+            text: item.type || 'Unknown type',
+            fontSize: 10,
+            fontFamily: 'Arial',
+            fill: '#fff',
+            align: 'center',
+            opacity: 0.8
+        });
+        
+        group.add(rect);
+        group.add(nameText);
+        group.add(versionText);
+        group.add(typeText);
+        
+        // Store component data
+        group.componentData = item;
+        group.isComponent = true;
+        
+        // Event handlers
+        group.on('click', (e) => handleComponentClick(e, group));
+        group.on('dblclick', () => expandComponent(group));
+        group.on('contextmenu', (e) => showContextMenu(e, group));
+    } else if (type === "vulnerability") {
+        // CVE ID
+        const idText = new Konva.Text({
+            x: 10,
+            y: 10,
+            width: width - 20,
+            text: item.id || 'Unknown',
+            fontSize: 14,
+            fontFamily: 'Arial',
+            fill: '#fff',
+            fontWeight: 'bold',
+            align: 'center'
+        });
+
+        // Vulnerability State
+        const stateText = new Konva.Text({
+            x: 10,
+            y: 35,
+            width: width - 20,
+            text: item.analysis.state || 'No State',
+            fontSize: 12,
+            fontFamily: 'Arial',
+            fill: '#fff',
+            align: 'center',
+            opacity: 0.9
+        });
+        
+
+        // avg rating calculation
+        sum_rating = 0;
+        for (var i = 0; i < item.ratings.length; i++) {
+            sum_rating += item.ratings[i].score;
         }
+        average_rating = sum_rating / item.ratings.length;
+
+        // Vulnerability Rating
+        const ratingText = new Konva.Text({
+            x: 10,
+            y: 55,
+            width: width - 20,
+            text: "average rating: " + average_rating.toFixed(2) || 'Unknown rating',
+            fontSize: 10,
+            fontFamily: 'Arial',
+            fill: '#fff',
+            align: 'center',
+            opacity: 0.8
+        });
         
-        // Constrain the dragged component to canvas boundaries
-        const x = group.x();
-        const y = group.y();
-        const maxX = stage.width() - width;
-        const maxY = stage.height() - height;
+        group.add(rect);
+        group.add(idText);
+        group.add(stateText);
+        group.add(ratingText);
         
-        if (x < 0) group.x(0);
-        if (y < 0) group.y(0);
-        if (x > maxX) group.x(maxX);
-        if (y > maxY) group.y(maxY);
+        // Store component data
+        group.vulnData = item;
+        group.isVuln = true;
         
-        // Store current position for next drag move
-        group.setAttr('lastX', group.x());
-        group.setAttr('lastY', group.y());
-        
-        updateConnectionLine(group);
-    });
-    group.on('mouseenter', () => {
-        document.body.style.cursor = 'pointer';
-        rect.shadowBlur(20);
-        layer.draw();
-    });
-    group.on('mouseleave', () => {
-        document.body.style.cursor = 'default';
-        rect.shadowBlur(10);
-        layer.draw();
-    });
-    
-    return group;
-}
-
-function createVulnerabilityBox(vuln, x, y, width, height, level) {
-    const colors = ['#6e89ffff', '#bb78ffff', '#f9c7ffff', '#ff8393ff', '#88c8ffff', '#8bf9ffff'];
-    const color = colors[level % colors.length];
-    
-    const group = new Konva.Group({
-        x: x,
-        y: y,
-        draggable: true
-    });
-
-    console.log(vuln)
-
-
-
-    // Background rectangle
-    const rect = new Konva.Rect({
-        width: width,
-        height: height,
-        fill: color,
-        stroke: '#fff',
-        strokeWidth: 2,
-        cornerRadius: 8,
-        shadowColor: 'rgba(0,0,0,0.3)',
-        shadowBlur: 10,
-        shadowOffset: { x: 0, y: 4 },
-        shadowOpacity: 0.3
-    });
-    
-    // CVE ID
-    const nameText = new Konva.Text({
-        x: 10,
-        y: 10,
-        width: width - 20,
-        text: vuln.id || 'Unknown',
-        fontSize: 14,
-        fontFamily: 'Arial',
-        fill: '#fff',
-        fontWeight: 'bold',
-        align: 'center'
-    });
-
-    // Vulnerability State
-    const versionText = new Konva.Text({
-        x: 10,
-        y: 35,
-        width: width - 20,
-        text: vuln.analysis.state || 'No State',
-        fontSize: 12,
-        fontFamily: 'Arial',
-        fill: '#fff',
-        align: 'center',
-        opacity: 0.9
-    });
-    
-
-    // avg rating calculation
-    sum_rating = 0;
-    for (var i = 0; i < vuln.ratings.length; i++) {
-        sum_rating += vuln.ratings[i].score;
+        // Event handlers
+        group.on('click', (e) => handleVulnClick(e, group));
+        group.on('dblclick', () => expandVulnerability(group));
+        group.on('contextmenu', (e) => showContextMenu(e, group));
     }
-    average_rating = sum_rating / vuln.ratings.length;
-
-    // Vulnerability Rating
-    const typeText = new Konva.Text({
-        x: 10,
-        y: 55,
-        width: width - 20,
-        text: "average rating: " + average_rating.toFixed(2) || 'Unknown rating',
-        fontSize: 10,
-        fontFamily: 'Arial',
-        fill: '#fff',
-        align: 'center',
-        opacity: 0.8
-    });
     
-    group.add(rect);
-    group.add(nameText);
-    group.add(versionText);
-    group.add(typeText);
-    
-    // Store component data
-    group.vulnData = vuln;
-    group.isVuln = true;
-    
-    // Event handlers
-    group.on('click', (e) => handleVulnClick(e, group));
-    group.on('dblclick', () => expandVulnerability(group));
-    group.on('contextmenu', (e) => showContextMenu(e, group));
     group.on('dragstart', () => {
         // Store initial position for multi-selection dragging
         group.setAttr('lastX', group.x());
