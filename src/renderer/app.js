@@ -201,6 +201,7 @@ async function loadSBOM(content) {
             bomFormat: data.bomFormat,
             specVersion: data.specVersion,
             hasComponents: !!data.components,
+            hasVulnerabilities: !!data.vulnerabilities,
             componentCount: data.components ? data.components.length : 0,
             vulnerabilitiesCount: data.vulnerabilities ? data.vulnerabilities.length : 0
         });
@@ -209,8 +210,26 @@ async function loadSBOM(content) {
         if (!data.bomFormat || !data.specVersion) {
             throw new Error('Invalid CycloneDX SBOM format - missing bomFormat or specVersion');
         }
+
         
         sbomData = data;
+
+        
+        if (sbomData && Array.isArray(sbomData.components)) {
+            sbomData.components.forEach((c, idx) => {
+                // If the component already has a bomRef – keep it.
+                // Otherwise generate a deterministic one based on the purl or name.
+                if (!c.bomRef) {
+                    if (c.purl) {
+                        // Use a URL‑safe version of the purl
+                        c.bomRef = encodeURIComponent(c.purl);
+                    } else {
+                        // Fallback – component‑index‑<N>
+                        c.bomRef = `component-${idx}-${Date.now()}`;
+                    }
+                }
+            });
+        }
         
         // Reset expansion state when loading new SBOM
         sbomExpanded = false;
@@ -363,15 +382,49 @@ function renderSBOM() {
     // Only render components if expanded
     console.log('renderSBOM - sbomExpanded:', sbomExpanded);
     console.log('renderSBOM - components count:', sbomData.components ? sbomData.components.length : 0);
-    if (sbomExpanded && sbomData.components && sbomData.components.length > 0) {
-        console.log('Rendering components hierarchy');
-        renderHierarchy(sbomData.components, 1, stage.width() / 2, 200, "component");
-    } else if (sbomData.vulnerabilities && sbomData.vulnerabilities.length > 0) {
-        console.log('Rendering vulnerabilities hierarchy')
-        renderHierarchy(sbomData.vulnerabilities, 1, stage.width() / 2, 200, "vulnerability");
-    }
-    else {
-        console.log('Not rendering components - sbomExpanded:', sbomExpanded);
+    console.log('renderSBOM - vulnerabilities count:', sbomData.vulnerabilities ? sbomData.vulnerabilities.length : 0);
+
+    if (sbomExpanded) {
+        const rootX = stage.width() / 2;
+        const rootY = 150;          // bottom centre of the SBOM box (50 + 100)
+
+        // ── Components ─────────────────────────────────────
+        if (sbomData.components && sbomData.components.length) {
+            console.log('Rendering component hierarchy');
+            renderHierarchy(
+                sbomData.components,
+                1,                     // level
+                rootX,
+                rootY,
+                "component",
+                null
+            );
+        }
+
+        // ── Vulnerabilities ─────────────────────────────────
+        if (sbomData.vulnerabilities && sbomData.vulnerabilities.length) {
+            console.log('Rendering top‑level (orphan) vulnerability hierarchy');
+
+            // Only render VEX entries that are **not** attached to a component.
+            const orphanVulns = getOrphanVulnerabilities();
+
+            if (orphanVulns.length) {
+                // Shift the orphan tree down a bit so it doesn’t overlap the component tree
+                const vulnOffsetY = rootY + 200; // 200 px lower than the component tree
+                renderHierarchy(
+                    orphanVulns,
+                    1,
+                    rootX,
+                    vulnOffsetY,
+                    "vulnerability",
+                    null                // no parent node for top‑level VEX
+                );
+            } else {
+                console.log('No orphan VEX entries – all vulnerabilities are attached to components');
+            }
+        }
+    } else {
+        console.log('SBOM collapsed – only root is shown');
     }
     
     console.log('Before layer.draw() - layer children count:', layer.children.length);
@@ -395,6 +448,21 @@ function renderSBOM() {
     }
 }
 
+function getOrphanVulnerabilities() {
+    if (!Array.isArray(sbomData.vulnerabilities)) return [];
+
+    return sbomData.vulnerabilities.filter(vuln => {
+        // If the VEX has no `affects` array or it is empty → orphan
+        if (!Array.isArray(vuln.affects) || vuln.affects.length === 0) return true;
+
+        // Build a list of all component references (bomRef | purl | name)
+        const compRefs = sbomData.components?.map(getComponentReference) || [];
+
+        // If none of the refs in `vuln.affects` match a component → orphan
+        return !vuln.affects.some(a => compRefs.includes(a.ref));
+    });
+}
+
 function addConnectionLine(parentX, parentY, childX, childY, childWidth, childHeigth) {
     const line = new Konva.Line({
         points: [parentX, parentY, childX + childWidth / 2, childY],
@@ -406,7 +474,7 @@ function addConnectionLine(parentX, parentY, childX, childY, childWidth, childHe
     return line;
 }
 
-function renderHierarchy(items, level, parentX, parentY, type) {
+function renderHierarchy(items, level, parentX, parentY, type, parentNode = null) {
     if (!items || items.length === 0) return;
     if (!sbomExpanded) {
         console.log('SBOM not expanded – abort hierarchy render');
@@ -445,7 +513,7 @@ function renderHierarchy(items, level, parentX, parentY, type) {
         // connection line (always behind the node)
         const line = addConnectionLine(
             parentX,
-            level === 1 ? 150 : parentY + (type === 'component' ? boxHeight : 0), // parent bottom Y
+            level === 1 ? 150 : parentY,    // parent bottom Y
             x,
             y,
             boxWidth,
@@ -453,29 +521,67 @@ function renderHierarchy(items, level, parentX, parentY, type) {
         );
 
         // the actual box (different factory per type)
-        const box = (type === 'component')
-            ? createSubBox(item, x, y, boxWidth, boxHeight, level, type)
-            : createSubBox(item, x, y, boxWidth, boxHeight, level, type);
+        const box = createSubBox(item, x, y, boxWidth, boxHeight, level, type);
 
-        // keep a reference to the line for drag updates
+        // store relationship info for drag updates
         box.connectionLine = line;
         box.parentX = parentX;
         box.parentY = parentY;
         box.level   = level;
+        box.parentNode = parentNode;       // <-- NEW – reference to the live parent
 
         // enable drag → keep line attached
-        box.on('dragmove', () => updateConnectionLine(box));
+        box.on('dragmove', () => {
+            updateConnectionLine(box);
+            // -------------------------------------------------
+            // Propagate the update to any *descendants* of this node
+            // -------------------------------------------------
+            layer.children.forEach(ch => {
+                if (ch.parentNode && isDescendant(ch, box)) {
+                    updateConnectionLine(ch);
+                }
+            });
+        });
 
-        // recursively render dependencies (only components have them)
+        // -------------------------------------------------
+        // Recursively render *dependencies* (components only)
+        // -------------------------------------------------
         if (type === 'component' && item.dependencies && item.dependencies.length > 0
             && expandedComponents.has(item.bomRef)) {
             const dependent = sbomData.components.filter(c =>
                 item.dependencies.includes(c.bomRef)
             );
             if (dependent.length) {
-                renderHierarchy(dependent, level + 1,
-                    x + boxWidth / 2, y + boxHeight + levelHeight,
-                    type);
+                renderHierarchy(
+                    dependent,
+                    level + 1,
+                    x + boxWidth / 2,
+                    y + boxHeight + levelHeight,
+                    type,
+                    box                     // parentNode = this component
+                );
+            }
+        }
+
+        // RenderEX children that reference THIS component
+        // -------------------------------------------------
+        if (type === 'component' && Array.isArray(sbomData.vulnerabilities)) {
+            const childVulns = sbomData.vulnerabilities.filter(vuln => {
+                if (!Array.isArray(vuln.affects)) return false;
+                const compRef = getComponentReference(item);
+                return vuln.affects.some(a => a.ref === compRef);
+            });
+
+            if (childVulns.length) {
+                const compBottom = getNodeBottomCenter(box);
+                renderHierarchy(
+                    childVulns,
+                    level + 1,
+                    compBottom.x,
+                    compBottom.y,
+                    'vulnerability',
+                    box                     // parentNode = this component
+                );
             }
         }
 
@@ -556,6 +662,7 @@ function createSubBox(item, x, y, width, height, level, type) {
         
         // Store component data
         group.componentData = item;
+        group.componentRef  = getComponentReference(item);   
         group.isComponent = true;
         
         // Event handlers
@@ -788,14 +895,14 @@ function createSBOMBox(centerX, y) {
         const y = group.y();
         const maxX = stage.width() - width;
         const maxY = stage.height() - height;
-        
+
         if (x < 0) group.x(0);
         if (y < 0) group.y(0);
         if (x > maxX) group.x(maxX);
         if (y > maxY) group.y(maxY);
-        
-        // Update all connection lines that connect to this SBOM box
-        updateSBOMConnectionLines(group);
+
+        // Update **all** lines on the canvas (components, sub‑components, VEX, …)
+        refreshAllLines();
     });
     group.on('mouseenter', () => {
         document.body.style.cursor = 'pointer';
@@ -867,7 +974,7 @@ function handleComponentClick(e, group) {
             showStatus(`Selected: SBOM (${sbomData.components ? sbomData.components.length : 0} components) and (${sbomData.vulnerabilities ? sbomData.vulnerabilities.length : 0} VEX)`);
         } else if (group.isComponent) {
             showStatus(`Selected: ${group.componentData.name || group.componentData.bomRef}`);
-        } else if (group.isVEX) {
+        } else if (group.isVuln) {
             showStatus(`Selected: ${group.vexData.id}`);
         } 
     }
@@ -937,28 +1044,28 @@ function handleVulnClick(e, group) {
 }
 
 function addVexToTarget(target) {
-    // load in sbom
-    console.log("adding vex to target " + target);
+    console.log("adding vex to target", target);
     if (!sbomData) {
         showError('No SBOM loaded – cannot add a VEX entry');
-        console.log("Error no sbom loaded");
         return;
     }
     if (!Array.isArray(sbomData.vulnerabilities)) {
         sbomData.vulnerabilities = [];
     }
 
-    // Build an empty vex file 
+    // -----------------------------------------------------------------
+    // Build a minimal VEX entry – details will be filled later.
+    // -----------------------------------------------------------------
     const ts = new Date().toISOString().split('T')[0];   // YYYY‑MM‑DD
     const newVuln = {
-        id:            `VULN-${Date.now()}`,   // temporary id – can be edited later
+        id:            `VULN-${Date.now()}`,   // temporary id – editable later
         source:         { name: 'Custom', url: '' },
-        description:   '',
-        detail:        '',
-        recommendation:'',
-        created:       ts,
-        published:     ts,
-        updated:       ts,
+        description:    '',
+        detail:         '',
+        recommendation: '',
+        created:        ts,
+        published:      ts,
+        updated:        ts,
         analysis: {
             state:        'reported',
             justification:'',
@@ -973,18 +1080,26 @@ function addVexToTarget(target) {
         affects:       []          // will be filled if we have a component target
     };
 
-    // try to use bomref first
+    // -----------------------------------------------------------------
+    // Attach the reference to the component we right‑clicked.
+    // -----------------------------------------------------------------
     if (target && target.componentData) {
-        const comp = target.componentData;
-        const ref  = comp.bomRef || comp.name || `component-${Date.now()}`;
-        newVuln.affects.push({ ref });
+        const ref = getComponentReference(target.componentData);
+        if (ref) {
+            newVuln.affects.push({ ref });
+        } else {
+            console.warn('Component has no identifiable reference – VEX will be orphaned');
+        }
     }
--
+
+    // -----------------------------------------------------------------
+    // Persist and refresh the canvas.
+    // -----------------------------------------------------------------
     sbomData.vulnerabilities.push(newVuln);
-    renderSBOM();                         // refresh the view
+    renderSBOM();                         // redraw the view
     showStatus(`Added new vulnerability ${newVuln.id}`);
 
-    // open to start adding
+    // Open the detail editor so the user can fill in the fields.
     window.heimdallAPI.openVexWindow(newVuln, 'vex');
 }
 
@@ -1143,10 +1258,14 @@ function updateContextMenuItems(group) {
             expandItem.style.display = 'block';
             collapseItem.style.display = 'none';
         }
-    } else {
+    } else if (group.isComponent) {
         // For components, show both options
         expandItem.style.display = 'block';
         collapseItem.style.display = 'block';
+    } else if (group.isVuln) {
+        console.log("isvuln")
+        expandItem.style.display = 'none';
+        collapseItem.style.display = 'none';
     }
 }
 
@@ -1186,7 +1305,7 @@ function handleContextMenuClick(e) {
                 // need to create a new vulnerabilities part in reference to this specific component
                 addVexToTarget(null);
         }
-    } else {
+    } else if (contextMenu.isComponent) {
         // Handle component actions
         const component = contextMenu.componentData;
         
@@ -1213,6 +1332,23 @@ function handleContextMenuClick(e) {
             case 'addVex':
                 // need to create a new vulnerabilities part in reference to this specific component
                 addVexToTarget(contextMenu);
+        }
+    } else if (contextMenu.isVuln) {
+        // Handle vulnerability actions
+        const vulnerability = contextMenu.vulnData;
+        console.log(vulnerability)
+
+        switch (action) {
+            case 'open':
+                window.heimdallAPI.openVexWindow(vulnerability, 'vulnerability');
+                break;
+            case 'save':
+                saveChangesToFile();
+                break;
+            case 'copy':
+                navigator.clipboard.writeText(vulnerability.id);
+                showStatus('Vuln ID copied to clipboard');
+                break;
         }
     }
     
@@ -1289,73 +1425,53 @@ function moveSelectedComponents(dx, dy) {
     }
 }
 
-function updateConnectionLine(componentBox) {
-    if (componentBox.connectionLine) {
-        const boxX = componentBox.x();
-        const boxY = componentBox.y();
-        const boxWidth = 200;
-        const boxHeight = 80;
-        
-        let parentX, parentY;
-        
-        if (componentBox.level === 1) {
-            // For level 1 components, find the current SBOM box position
-            const sbomBox = layer.children.find(child => child.isSBOMRoot);
-            if (sbomBox) {
-                parentX = sbomBox.x() + 150; // SBOM box center X
-                parentY = sbomBox.y() + 100; // SBOM box bottom Y
-            } else {
-                // Fallback to stored values if SBOM box not found
-                parentX = componentBox.parentX;
-                parentY = componentBox.parentY + 100;
-            }
+function updateConnectionLine(node) {
+    if (!node.connectionLine) return;
+
+    const boxX = node.x();
+    const boxY = node.y();
+    const boxWidth  = 200;
+    const boxHeight = 80;
+
+    let parentX, parentY;
+
+    // If the node knows its live parent, use that.
+    // Otherwise fall back to the original logic.
+    if (node.parentNode) {
+        const parentPos = getNodeBottomCenter(node.parentNode);
+        parentX = parentPos.x;
+        parentY = parentPos.y;
+    } else if (node.level === 1) {
+        // Level‑1 nodes connect to the SBOM root
+        const sbomBox = layer.children.find(child => child.isSBOMRoot);
+        if (sbomBox) {
+            parentX = sbomBox.x() + 150;   // SBOM centre X
+            parentY = sbomBox.y() + 100;   // SBOM bottom Y
         } else {
-            // For other levels, use stored parent coordinates
-            parentX = componentBox.parentX;
-            parentY = componentBox.parentY + 80;
+            // Fallback – use stored values
+            parentX = node.parentX;
+            parentY = node.parentY + 100;
         }
-        
-        componentBox.connectionLine.points([
-            parentX, 
-            parentY, 
-            boxX + boxWidth / 2, 
-            boxY
-        ]);
-        
-        // Ensure line stays behind components
-        componentBox.connectionLine.moveToBottom();
-        componentBox.connectionLine.draw();
+    } else {
+        // Nodes without a live parent (should not happen) – use stored coords
+        parentX = node.parentX;
+        parentY = node.parentY + 80;
     }
+
+    node.connectionLine.points([
+        parentX,
+        parentY,
+        boxX + boxWidth / 2,
+        boxY
+    ]);
+
+    // Ensure line stays behind components
+    node.connectionLine.moveToBottom();
+    node.connectionLine.draw();
 }
 
 function updateSBOMConnectionLines(sbomBox) {
-    // Find all components that connect to this SBOM box (level 1 components)
-    layer.children.forEach(child => {
-        if ( (child.componentData || child.vulnData) && child.level === 1 && child.connectionLine) {
-            // Update the parent end point to the new SBOM box position
-            const sbomX = sbomBox.x() + 150; // SBOM box center X
-            const sbomY = sbomBox.y() + 100; // SBOM box bottom Y
-            
-            const boxX = child.x();
-            const boxY = child.y();
-            const boxWidth = 200;
-            
-            child.connectionLine.points([
-                sbomX, 
-                sbomY, 
-                boxX + boxWidth / 2, 
-                boxY
-            ]);
-            
-            // Update the stored parent coordinates
-            child.parentX = sbomX;
-            child.parentY = sbomBox.y();
-            
-            // Ensure line stays behind components
-            child.connectionLine.moveToBottom();
-            child.connectionLine.draw();
-        }
-    });
+    refreshAllLines();
 }
 
 // Keyboard shortcuts
@@ -1760,6 +1876,34 @@ function endPanning(e) {
     
     // Reset cursor
     document.body.style.cursor = 'default';
+}
+
+function getNodeBottomCenter(node) {
+    const boxWidth  = 200;
+    const boxHeight = 80;
+    return {
+        x: node.x() + boxWidth / 2,
+        y: node.y() + boxHeight          // bottom edge of the rectangle
+    };
+}
+
+function getComponentReference(comp) {
+    if (!comp) return null;
+    return comp.bomRef || comp.purl || comp.name || null;
+}
+
+function isDescendant(node, ancestor) {
+    if (!node || !ancestor) return false;
+    if (node === ancestor) return true;
+    return isDescendant(node.parentNode, ancestor);
+}
+
+function refreshAllLines() {
+    layer.children.forEach(child => {
+        if (child.connectionLine) {
+            updateConnectionLine(child);
+        }
+    });
 }
 
 // Initialize the application when the page loads
