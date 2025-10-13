@@ -13,7 +13,6 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-
 // Global variables
 let currentFile = null;
 let sbomData = null;
@@ -342,10 +341,10 @@ function renderSBOM() {
     console.log('renderSBOM - components count:', sbomData.components ? sbomData.components.length : 0);
     if (sbomExpanded && sbomData.components && sbomData.components.length > 0) {
         console.log('Rendering components hierarchy');
-        renderComponentsHierarchy(sbomData.components, 1, stage.width() / 2, 200);
+        renderHierarchy(sbomData.components, 1, stage.width() / 2, 200, "component");
     } else if (sbomData.vulnerabilities && sbomData.vulnerabilities.length > 0) {
         console.log('Rendering vulnerabilities hierarchy')
-        renderVulnerabilitiesHierarchy(sbomData.vulnerabilities, 1, stage.width() / 2, 200);
+        renderHierarchy(sbomData.vulnerabilities, 1, stage.width() / 2, 200, "vulnerability");
     }
     else {
         console.log('Not rendering components - sbomExpanded:', sbomExpanded);
@@ -372,193 +371,91 @@ function renderSBOM() {
     }
 }
 
-function renderComponentsHierarchy(components, level, parentX, parentY) {
-    console.log('renderComponentsHierarchy called - level:', level, 'sbomExpanded:', sbomExpanded);
-    if (!components || components.length === 0) return;
-    
-    // Don't render any components if SBOM is not expanded
-    if (!sbomExpanded) {
-        console.log('SBOM not expanded, not rendering any components');
-        return;
-    }
-    
-    const boxWidth = 200;
-    const boxHeight = 80;
-    const spacing = 50;
-    const levelHeight = 120;
-    const totalWidth = components.length * (boxWidth + spacing) - spacing;
-    
-    // Calculate start position, ensuring it stays within canvas bounds
-    let startXPos = parentX - totalWidth / 2;
-    const canvasWidth = stage.width();
-    const canvasHeight = stage.height();
-    
-    // Ensure components don't go off the left edge
-    if (startXPos < 20) {
-        startXPos = 20;
-    }
-    
-    // Ensure components don't go off the right edge
-    if (startXPos + totalWidth > canvasWidth - 20) {
-        startXPos = canvasWidth - totalWidth - 20;
-    }
-    
-    // If components are too wide for the canvas, reduce spacing
-    if (totalWidth > canvasWidth - 40) {
-        const reducedSpacing = Math.max(10, (canvasWidth - 40 - components.length * boxWidth) / (components.length - 1));
-        const newTotalWidth = components.length * (boxWidth + reducedSpacing) - reducedSpacing;
-        startXPos = parentX - newTotalWidth / 2;
-    }
-    
-    // Ensure we don't go off the bottom edge
-    const y = Math.min(parentY, canvasHeight - boxHeight - 20);
-    
-    // Calculate actual spacing (may be reduced if components are too wide)
-    const actualSpacing = totalWidth > canvasWidth - 40 ? 
-        Math.max(10, (canvasWidth - 40 - components.length * boxWidth) / (components.length - 1)) : 
-        spacing;
-    
-    // Create all connection lines first (so they render behind components)
-    const lines = [];
-    components.forEach((component, index) => {
-        const x = startXPos + index * (boxWidth + actualSpacing);
-        
-        // Create connection line from parent to this component
-        // For SBOM root, connect to bottom center of SBOM box (SBOM is at y=50, so bottom is at y+100=150)
-        // For components, connect to bottom center of parent component (parentY is the top, so bottom is parentY + 80)
-        const parentEndY = level === 1 ? 150 : parentY + 80;
-        const line = new Konva.Line({
-            points: [parentX, parentEndY, x + boxWidth / 2, y],
-            stroke: '#667eea',
-            strokeWidth: 2,
-            opacity: 0.6
-        });
-        lines.push({ line, x, index });
+function addConnectionLine(parentX, parentY, childX, childY, childWidth, childHeigth) {
+    const line = new Konva.Line({
+        points: [parentX, parentY, childX + childWidth / 2, childY],
+        stroke: '#667eea',
+        strokeWidth: 2,
+        opacity: 0.6
     });
-    
-    // Add all lines to layer first (they will be behind components)
-    lines.forEach(({ line }) => {
-        layer.add(line);
-    });
-    
-    // Now create and add components (they will be on top of lines)
-    components.forEach((component, index) => {
-        const x = startXPos + index * (boxWidth + actualSpacing);
-        const componentBox = createComponentBox(component, x, y, boxWidth, boxHeight, level);
-        layer.add(componentBox);
-        
-        // Store reference to line for dynamic updates
-        componentBox.connectionLine = lines[index].line;
-        componentBox.parentX = parentX;
-        componentBox.parentY = parentY;
-        componentBox.level = level;
-        
-        // Add drag event to update line position
-        componentBox.on('dragmove', () => {
-            updateConnectionLine(componentBox);
-        });
-        
-        // Add dependencies if they exist and are expanded
-        if (component.dependencies && component.dependencies.length > 0) {
-            const dependentComponents = sbomData.components.filter(comp => 
-                component.dependencies.includes(comp.bomRef)
-            );
-            
-            if (dependentComponents.length > 0 && expandedComponents.has(component.bomRef)) {
-                // Recursively render dependent components
-                renderComponentsHierarchy(dependentComponents, level + 1, x + boxWidth / 2, y + boxHeight + levelHeight);
-            }
-        }
-    });
+    layer.add(line);
+    return line;
 }
 
-function renderVulnerabilitiesHierarchy(vulnerability, level, parentX, parentY) {
-    console.log('renderVulnerabilitiesHierarchy called - level:', level, 'sbomExpanded:', sbomExpanded);
-    if (!vulnerability || vulnerability.length === 0) return;
-    
-    // Don't render any vuln if SBOM is not expanded
+function renderHierarchy(items, level, parentX, parentY, type) {
+    if (!items || items.length === 0) return;
     if (!sbomExpanded) {
-        console.log('SBOM not expanded, not rendering any vulnerabilities');
+        console.log('SBOM not expanded – abort hierarchy render');
         return;
     }
-    
-    const boxWidth = 200;
-    const boxHeight = 80;
-    const spacing = 50;
+
+    // ---------- Layout constants ----------
+    const boxWidth   = 200;
+    const boxHeight  = 80;
+    const spacing    = 50;
     const levelHeight = 120;
-    const totalWidth = vulnerability.length * (boxWidth + spacing) - spacing;
-    
-    // Calculate start position, ensuring it stays within canvas bounds
-    let startXPos = parentX - totalWidth / 2;
-    const canvasWidth = stage.width();
-    const canvasHeight = stage.height();
-    
-    // Ensure vuln don't go off the left edge
-    if (startXPos < 20) {
-        startXPos = 20;
-    }
-    
-    // Ensure vuln don't go off the right edge
-    if (startXPos + totalWidth > canvasWidth - 20) {
-        startXPos = canvasWidth - totalWidth - 20;
-    }
-    
-    // If vuln are too wide for the canvas, reduce spacing
-    if (totalWidth > canvasWidth - 40) {
-        const reducedSpacing = Math.max(10, (canvasWidth - 40 - vulnerability.length * boxWidth) / (vulnerability.length - 1));
-        const newTotalWidth = vulnerability.length * (boxWidth + reducedSpacing) - reducedSpacing;
-        startXPos = parentX - newTotalWidth / 2;
-    }
-    
-    // Ensure we don't go off the bottom edge
-    const y = Math.min(parentY, canvasHeight - boxHeight - 20);
-    
-    // Calculate actual spacing (may be reduced if vuln are too wide)
-    const actualSpacing = totalWidth > canvasWidth - 40 ? 
-        Math.max(10, (canvasWidth - 40 - vulnerability.length * boxWidth) / (vulnerability.length - 1)) : 
-        spacing;
-    
-    // Create all connection lines first (so they render behind vuln)
-    const lines = [];
-    vulnerability.forEach((vulnerability, index) => {
-        const x = startXPos + index * (boxWidth + actualSpacing);
-        
-        // Create connection line from parent to this component
-        // For SBOM root, connect to bottom center of SBOM box (SBOM is at y=50, so bottom is at y+100=150)
-        // For vuln, connect to bottom center of parent component (parentY is the top, so bottom is parentY + 80)
-        const parentEndY = level === 1 ? 150 : parentY;
-        const line = new Konva.Line({
-            points: [parentX, parentEndY, x + boxWidth / 2, y],
-            stroke: '#667eea',
-            strokeWidth: 2,
-            opacity: 0.6
-        });
-        lines.push({ line, x, index });
-    });
-    
-    // Add all lines to layer first (they will be behind vuln)
-    lines.forEach(({ line }) => {
-        layer.add(line);
-    });
-    
-    // Now create and add vuln (they will be on top of lines)
-    vulnerability.forEach((vuln, index) => {
-        const x = startXPos + index * (boxWidth + actualSpacing);
-        const vulnBox = createVulnerabilityBox(vuln, x, y, boxWidth, boxHeight, level);
-        layer.add(vulnBox);
-        
-        // Store reference to line for dynamic updates
-        vulnBox.connectionLine = lines[index].line;
-        vulnBox.parentX = parentX;
-        vulnBox.parentY = parentY;
-        vulnBox.level = level;
-        
-        // Add drag event to update line position
-        vulnBox.on('dragmove', () => {
-            updateConnectionLine(vulnBox);
-        });
-        
-        
+
+    // total width the row would occupy (including spacing)
+    const totalWidth = items.length * (boxWidth + spacing) - spacing;
+
+    // ----- Determine start X (centre‑aligned but kept inside canvas) -----
+    const canvasW = stage.width();
+    let startX = parentX - totalWidth / 2;
+
+    // keep a 20‑px gutter on both sides
+    startX = Math.max(20, Math.min(startX, canvasW - totalWidth - 20));
+
+    // if the row would overflow, shrink spacing (never below 10 px)
+    const actualSpacing = totalWidth > canvasW - 40
+        ? Math.max(10, (canvasW - 40 - items.length * boxWidth) / (items.length - 1))
+        : spacing;
+
+    // Y‑coordinate for this level – never drop below the bottom gutter
+    const canvasH = stage.height();
+    const y = Math.min(parentY + levelHeight, canvasH - boxHeight - 20);
+
+    // ---------- Draw every node ----------
+    items.forEach((item, idx) => {
+        const x = startX + idx * (boxWidth + actualSpacing);
+
+        // connection line (always behind the node)
+        const line = addConnectionLine(
+            parentX,
+            level === 1 ? 150 : parentY + (type === 'component' ? boxHeight : 0), // parent bottom Y
+            x,
+            y,
+            boxWidth,
+            boxHeight
+        );
+
+        // the actual box (different factory per type)
+        const box = (type === 'component')
+            ? createComponentBox(item, x, y, boxWidth, boxHeight, level)
+            : createVulnerabilityBox(item, x, y, boxWidth, boxHeight, level);
+
+        // keep a reference to the line for drag updates
+        box.connectionLine = line;
+        box.parentX = parentX;
+        box.parentY = parentY;
+        box.level   = level;
+
+        // enable drag → keep line attached
+        box.on('dragmove', () => updateConnectionLine(box));
+
+        // recursively render dependencies (only components have them)
+        if (type === 'component' && item.dependencies && item.dependencies.length > 0
+            && expandedComponents.has(item.bomRef)) {
+            const dependent = sbomData.components.filter(c =>
+                item.dependencies.includes(c.bomRef)
+            );
+            if (dependent.length) {
+                renderHierarchy(dependent, level + 1,
+                    x + boxWidth / 2, y + boxHeight + levelHeight,
+                    'component');
+            }
+        }
+
+        layer.add(box);
     });
 }
 
@@ -1023,11 +920,14 @@ function handleComponentClick(e, group) {
             rect.strokeWidth(3);
         }
         
+
         if (group.isSBOMRoot) {
-            showStatus(`Selected: SBOM (${sbomData.components ? sbomData.components.length : 0} components)`);
-        } else {
+            showStatus(`Selected: SBOM (${sbomData.components ? sbomData.components.length : 0} components) and (${sbomData.vulnerabilities ? sbomData.vulnerabilities.length : 0} VEX)`);
+        } else if (group.isComponent) {
             showStatus(`Selected: ${group.componentData.name || group.componentData.bomRef}`);
-        }
+        } else if (group.isVEX) {
+            showStatus(`Selected: ${group.vexData.id}`);
+        } 
     }
     
     layer.draw();
@@ -1057,10 +957,10 @@ function handleVulnClick(e, group) {
             // Select
             selectedNodes.push(group);
             const rect = group.findOne('Rect');
-            if (rect) {
-                rect.stroke('#ffd700');
-                rect.strokeWidth(3);
-            }
+            // if (rect) {
+            //     rect.stroke('#ff9900ff');
+            //     rect.strokeWidth(3);
+            // }
         }
         
         if (selectedNodes.length === 0) {
@@ -1080,7 +980,7 @@ function handleVulnClick(e, group) {
         
         const rect = group.findOne('Rect');
         if (rect) {
-            rect.stroke('#ffd700');
+            rect.stroke('#ff9900ff');
             rect.strokeWidth(3);
         }
         
@@ -1727,8 +1627,9 @@ function deselectAll() {
 function updateSelectionFromBox(startX, startY, endX, endY) {
     // Find components within the selection box
     const selectedComponents = [];
+    const selectedVulns = [];
     layer.children.forEach(child => {
-        if (child.isComponent || child.isSBOMRoot) {
+        if (child.isComponent || child.isSBOMRoot || child.isVuln) {
             // Convert component position to stage coordinates
             const childPos = child.getAbsolutePosition();
             const childRect = child.getClientRect();
@@ -1738,7 +1639,7 @@ function updateSelectionFromBox(startX, startY, endX, endY) {
                 childPos.x <= endX &&
                 childPos.y + childRect.height >= startY && 
                 childPos.y <= endY) {
-                selectedComponents.push(child);
+                (child.isComponent || child.isSBOMRoot) ? selectedComponents.push(child) : selectedVulns.push(child);
             }
         }
     });
@@ -1746,6 +1647,13 @@ function updateSelectionFromBox(startX, startY, endX, endY) {
     // First, deselect all components that are no longer in the selection box
     selectedNodes.forEach(node => {
         if (!selectedComponents.includes(node)) {
+            const rect = node.findOne('Rect');
+            if (rect) {
+                rect.stroke('#fff');
+                rect.strokeWidth(2);
+            }
+        }
+        if (!selectedVulns.includes(node)) {
             const rect = node.findOne('Rect');
             if (rect) {
                 rect.stroke('#fff');
@@ -1762,14 +1670,25 @@ function updateSelectionFromBox(startX, startY, endX, endY) {
             rect.strokeWidth(3);
         }
     });
+    selectedVulns.forEach(node => {
+        const rect = node.findOne('Rect');
+        if (rect) {
+            rect.stroke('#ff9900ff');
+            rect.strokeWidth(3);
+        }
+    });
     
-    // Update the selected nodes array
-    selectedNodes = selectedComponents;
+    // Update the selected nodes array and append components and vuln
+    selectedNodes = selectedComponents.concat(selectedVulns);
     selectedNode = selectedComponents.length > 0 ? selectedComponents[0] : null;
     
     // Update status
-    if (selectedComponents.length > 0) {
+    if (selectedComponents.length > 0 && selectedVulns.length > 0) {
+        showStatus(`Selected ${selectedComponents.length} component(s) and ${selectedVulns.length} vulnerability(ies)`);
+    }else if (selectedComponents.length > 0) {
         showStatus(`Selected ${selectedComponents.length} component(s)`);
+    } else if (selectedVulns.length > 0) {
+        showStatus(`Selected ${selectedVulns.length} vulnerability(ies)`);
     } else {
         showStatus('Ready');
     }

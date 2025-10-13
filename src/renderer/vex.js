@@ -13,16 +13,11 @@
  limitations under the License.
 */
 
-// ---------------------------------------------------------------
 // Global variables
-// ---------------------------------------------------------------
 let currentItemData = null;   // VEX object we are editing
 let currentItemType = null;   // should be 'vex'
 let hasChanges = false;       // dirty flag – enables Save button
 
-// ---------------------------------------------------------------
-// DOM references (must match IDs in vex.html)
-// ---------------------------------------------------------------
 const loadingOverlay   = document.getElementById('loadingOverlay');
 const detailForm       = document.getElementById('detailForm');
 const detailTitle      = document.getElementById('detailTitle');
@@ -65,9 +60,6 @@ const collectionFields = {
     ]
 };
 
-// ---------------------------------------------------------------
-// Ensure a Save button exists (adds one if the HTML didn’t have it)
-// ---------------------------------------------------------------
 function ensureSaveButton() {
     if (saveBtn) return;               // already in the DOM
 
@@ -79,16 +71,13 @@ function ensureSaveButton() {
     if (toolbar) toolbar.insertBefore(saveBtn, closeBtn);
 }
 
-// ---------------------------------------------------------------
-// Init & event listeners
-// ---------------------------------------------------------------
+
 function init() {
     ensureSaveButton();
     setupEventListeners();
     listenForItemData();
 }
 
-// ---------------------------------------------------------------
 function setupEventListeners() {
     // Close / Save
     if (closeBtn) closeBtn.addEventListener('click', closeWindow);
@@ -110,9 +99,6 @@ function setupEventListeners() {
     });
 }
 
-// ---------------------------------------------------------------
-// Receive data from the main process (same channel as detail.js)
-// ---------------------------------------------------------------
 function listenForItemData() {
     window.heimdallAPI.onItemData(data => {
         currentItemData = data.itemData;
@@ -121,9 +107,6 @@ function listenForItemData() {
     });
 }
 
-// ---------------------------------------------------------------
-// Helper – safely get the current value of a field (input or span)
-// ---------------------------------------------------------------
 function getFieldValue(id) {
     const el = document.getElementById(id);
     if (!el) return '';
@@ -132,9 +115,6 @@ function getFieldValue(id) {
     return el.textContent;
 }
 
-/* -------------------------------------------------------------
-   Helper – replace a placeholder element with an editable control
-   ------------------------------------------------------------- */
 function makeEditable(el, value) {
     if (!el) return null;
 
@@ -156,9 +136,6 @@ function makeEditable(el, value) {
     return newEl;
 }
 
-/* -------------------------------------------------------------
-   Load VEX data into the editable form
-   ------------------------------------------------------------- */
 function loadItemData() {
     if (!currentItemData) return;
     showLoading();
@@ -181,13 +158,17 @@ function loadItemData() {
 
         // Analysis – we render it as a simple textarea with one line per property
         const analysisObj = currentItemData.analysis || {};
-        const analysisText = [
-            `state: ${analysisObj.state || ''}`,
-            `justification: ${analysisObj.justification || ''}`,
-            `response: ${Array.isArray(analysisObj.response) ? analysisObj.response.join(', ') : ''}`,
-            `detail: ${analysisObj.detail || ''}`
-        ].join('\n');
-        analysisInput = makeEditable(document.getElementById('vexAnalysis'), analysisText);
+        const analysisState = analysisObj.state || '';
+        const analysisJustification = analysisObj.justification || '';
+        const analysisResponse = Array.isArray(analysisObj.response) ? analysisObj.response.join(', ') : '';
+        const analysisDetail = analysisObj.detail || '';
+
+        // console.log(analysisText);
+        analysisStateInput = makeEditable(document.getElementById('vexAnalysisState'), analysisState);
+        analysisJustificationInput = makeEditable(document.getElementById('vexAnalysisJustification'), analysisJustification);
+        analysisResponseInput = makeEditable(document.getElementById('vexAnalysisResponse'), analysisResponse);
+        analysisDetailInput = makeEditable(document.getElementById('vexAnalysisDetail'), analysisDetail);
+        // analysisInput = makeEditable(document.getElementById('vexAnalysis'), analysisText);
 
         // Credits & CWEs ----------------------------------------------------
         const creditsNames = (currentItemData.credits?.individuals || []).map(i => i.name).join(', ');
@@ -213,9 +194,6 @@ function loadItemData() {
     }
 }
 
-/* -------------------------------------------------------------
-   Date helpers – convert ISO ↔ datetime-local format
-   ------------------------------------------------------------- */
 function toDateTimeLocal(iso) {
     if (!iso) return '';
     // Keep YYYY‑MM‑DDTHH:MM (drop seconds & timezone)
@@ -226,9 +204,6 @@ function fromDateTimeLocal(val) {
     return new Date(val).toISOString();
 }
 
-/* -------------------------------------------------------------
-   Collection rendering helpers
-   ------------------------------------------------------------- */
 function renderCollectionEditors(name, items, rowRenderer) {
     const container = {
         advisories: advisoriesContainer,
@@ -305,9 +280,6 @@ function renderAffectRow(item, idx) {
     return row;
 }
 
-/* -------------------------------------------------------------
-   Remove an item from a collection and re‑render that collection.
-   ------------------------------------------------------------- */
 function removeFromCollection(name, idx) {
     if (!Array.isArray(currentItemData[name])) return;
     currentItemData[name].splice(idx, 1);
@@ -318,10 +290,7 @@ function removeFromCollection(name, idx) {
     if (saveBtn) saveBtn.disabled = false;
 }
 
-/* -------------------------------------------------------------
-   Prompt‑based editor for adding a new collection item.
-   (Replace with a modal if you prefer a richer UI.)
-   ------------------------------------------------------------- */
+
 function openCollectionEditor(collectionName) {
     const fields = collectionFields[collectionName]
     
@@ -398,9 +367,6 @@ function openCollectionEditor(collectionName) {
     container.insertBefore(tempRow, container.firstChild);
 }
 
-/* -------------------------------------------------------------
-   Utility – set a nested property given an array of keys.
-   ------------------------------------------------------------- */
 function setNested(obj, keys, value) {
     const last = keys.pop();
     let cur = obj;
@@ -411,9 +377,6 @@ function setNested(obj, keys, value) {
     cur[last] = value;
 }
 
-/* -------------------------------------------------------------
-   Utility – HTML‑escape a string for safe attribute insertion.
-   ------------------------------------------------------------- */
 function escapeHTML(str) {
     return (str ?? '').replace(/&/g, '&amp;')
                      .replace(/"/g, '&quot;')
@@ -422,11 +385,7 @@ function escapeHTML(str) {
                      .replace(/>/g, '&gt;');
 }
 
-/* -------------------------------------------------------------
-   Save – build a fresh VEX object from the edited fields and
-   push it back to the main window (app.js already listens on
-   `onItemUpdated`).
-   ------------------------------------------------------------- */
+
 async function saveChanges() {
     try {
         // ----- parse the combined source string (name (url)) -----
@@ -504,9 +463,6 @@ async function saveChanges() {
     }
 }
 
-/* -------------------------------------------------------------
-   UI helper functions (unchanged except a tiny fix)
-   ------------------------------------------------------------- */
 function closeWindow() {
     if (hasChanges) {
         const ok = confirm('You have unsaved changes. Are you sure you want to close?');
@@ -534,7 +490,4 @@ function hideValidationErrors() {
     validationInfo.classList.add('valid');
 }
 
-/* -------------------------------------------------------------
-   Initialise when the page loads
-   ------------------------------------------------------------- */
 document.addEventListener('DOMContentLoaded', init);
